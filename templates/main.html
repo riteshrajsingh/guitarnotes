@@ -2,7 +2,7 @@
 <html lang="en">
 <head>
     <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
     <title>Guitar Notes Manager</title>
     <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.2.3/dist/css/bootstrap.min.css" rel="stylesheet">
     <link href="https://cdn.jsdelivr.net/npm/bootstrap-icons@1.10.0/font/bootstrap-icons.css" rel="stylesheet">
@@ -119,6 +119,7 @@
 
 <!-- Add this style to your existing <style> section -->
 <style>
+
         #fretboard-container {
             display: flex;
             flex-direction: column;
@@ -211,6 +212,25 @@
             background-color: rgba(0,0,255,0.7);
             border-color: darkblue;
         }
+
+        .full-note-marker {
+            cursor: pointer;
+            transition: transform 0.2s;
+        }
+        .full-note-marker:hover {
+            transform: scale(1.1);
+        }
+
+        .full-note-marker.natural-note {
+            background-color: rgba(0,128,0,0.7);
+            border-color: darkgreen;
+        }
+
+        .full-note-marker.accidental-note {
+            background-color: rgba(0,0,255,0.7);
+            border-color: darkblue;
+        }
+
 </style>
 
 
@@ -219,10 +239,6 @@
 <script>
         const ChromaticScale = ['C', 'C#', 'D', 'D#', 'E', 'F', 'F#', 'G', 'G#', 'A', 'A#', 'B'];
 
-        function isNaturalNote(note) {
-            const naturalNotes = ['C', 'D', 'E', 'F', 'G', 'A', 'B'];
-            return naturalNotes.includes(note);
-        }
 
 const FretPositions = [
     0,      // Open string
@@ -252,14 +268,61 @@ function createNoteMarker(stringEl, note, fret) {
     // Use precise percentage positioning
     noteMarker.style.left = `${FretPositions[fret]}%`;
 
+    // Add click event to play note
+    noteMarker.addEventListener('click', () => {
+        const frequency = getNoteFrequency(stringNote, fret);
+        playNote(frequency);
+    });
+
     stringEl.appendChild(noteMarker);
+}
+
+function getNoteFrequency(stringNote, fret) {
+    // Detailed frequency mapping for standard guitar tuning
+    const baseFrequencies = {
+        'E': {
+            'high': 329.63,  // High E string (1st string)
+            'low': 82.41     // Low E string (6th string)
+        },
+        'B': 246.94,  // B string (2nd string)
+        'G': 196.00,  // G string (3rd string)
+        'D': 146.83,  // D string (4th string)
+        'A': 110.00,  // A string (5th string)
+    };
+
+    // Determine base frequency
+    let baseFreq;
+    if (stringNote === 'E') {
+        // Special handling for E strings
+        baseFreq = stringNote === 'E' ? baseFrequencies['E']['high'] : baseFrequencies['E']['low'];
+    } else {
+        baseFreq = baseFrequencies[stringNote];
+    }
+
+    // Validate base frequency
+    if (!baseFreq || isNaN(baseFreq)) {
+        console.error(`Invalid base frequency for string: ${stringNote}`);
+        return 440; // Default to A4 if invalid
+    }
+
+    // Calculate frequency based on semitone steps
+    const semitoneStep = Math.pow(2, 1/12);
+    const frequency = baseFreq * Math.pow(semitoneStep, fret);
+
+    // Additional safety check
+    if (!isFinite(frequency)) {
+        console.error(`Invalid frequency calculation: ${frequency}`);
+        return 440; // Default to A4 if calculation fails
+    }
+
+    return frequency;
 }
 
 function createFullFretboard() {
     const fretboardEl = document.getElementById('full-fretboard');
     const guitarStrings = ['E', 'B', 'G', 'D', 'A', 'E'];
 
-    guitarStrings.forEach((stringNote) => {
+    guitarStrings.forEach((stringNote, stringIndex) => {
         const stringEl = document.createElement('div');
         stringEl.className = 'full-guitar-string';
 
@@ -268,12 +331,90 @@ function createFullFretboard() {
             const noteIndex = (ChromaticScale.indexOf(stringNote) + fret) % 12;
             const note = ChromaticScale[noteIndex];
 
-            createNoteMarker(stringEl, note, fret);
+            const noteMarker = document.createElement('div');
+            noteMarker.className = 'full-note-marker';
+            noteMarker.textContent = note;
+
+            noteMarker.classList.add(
+                isNaturalNote(note) ? 'natural-note' : 'accidental-note'
+            );
+
+            // Use precise percentage positioning
+            noteMarker.style.left = `${FretPositions[fret]}%`;
+
+            // Add click event to play note
+            noteMarker.addEventListener('click', () => {
+                const frequency = getNoteFrequency(stringNote, fret);
+                playNote(frequency);
+            });
+
+            stringEl.appendChild(noteMarker);
         }
 
         fretboardEl.appendChild(stringEl);
     });
 }
+
+// Modify isNaturalNote to work with notes that include octave
+function isNaturalNote(note) {
+    const naturalNotes = ['C', 'D', 'E', 'F', 'G', 'A', 'B'];
+    return naturalNotes.includes(note);
+}
+
+
+// Add this near the top of your script, after the ChromaticScale definition
+let audioContext = null;
+
+function initAudioContext() {
+    if (!audioContext) {
+        audioContext = new (window.AudioContext || window.webkitAudioContext)();
+    }
+}
+
+function playNote(frequency, duration = 0.5) {
+    // Ensure audio context is initialized
+    if (!audioContext) {
+        audioContext = new (window.AudioContext || window.webkitAudioContext)();
+    }
+
+    // Validate frequency
+    if (!frequency || !isFinite(frequency) || frequency <= 0) {
+        console.error(`Invalid frequency: ${frequency}`);
+        frequency = 440; // Default to A4
+    }
+
+    try {
+        // Create oscillator
+        const oscillator = audioContext.createOscillator();
+        const gainNode = audioContext.createGain();
+
+        // Set oscillator type and frequency
+        oscillator.type = 'sine';
+
+        // Safely set frequency
+        oscillator.frequency.setValueAtTime(
+            Math.min(Math.max(frequency, 20), 20000),
+            audioContext.currentTime
+        );
+
+        // Create fade in and out
+        gainNode.gain.setValueAtTime(0, audioContext.currentTime);
+        gainNode.gain.linearRampToValueAtTime(0.5, audioContext.currentTime + 0.01);
+        gainNode.gain.linearRampToValueAtTime(0, audioContext.currentTime + duration);
+
+        // Connect nodes
+        oscillator.connect(gainNode);
+        gainNode.connect(audioContext.destination);
+
+        // Start and stop oscillator
+        oscillator.start();
+        oscillator.stop(audioContext.currentTime + duration);
+
+    } catch (error) {
+        console.error('Error playing note:', error);
+    }
+}
+
 
         createFullFretboard();
     </script>
