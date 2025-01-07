@@ -1,0 +1,286 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Guitar Notes Manager</title>
+    <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.2.3/dist/css/bootstrap.min.css" rel="stylesheet">
+    <link href="https://cdn.jsdelivr.net/npm/bootstrap-icons@1.10.0/font/bootstrap-icons.css" rel="stylesheet">
+    <style>
+        body {
+            background-color: #f4f4f4;
+            font-family: 'Arial', sans-serif;
+        }
+        .card-hover:hover {
+            transform: scale(1.05);
+            box-shadow: 0 10px 20px rgba(0,0,0,0.12);
+            transition: all 0.3s ease;
+        }
+    </style>
+</head>
+<!-- Google tag (gtag.js) -->
+<script async src="https://www.googletagmanager.com/gtag/js?id=G-KR7X84HFYE"></script>
+<script>
+  window.dataLayer = window.dataLayer || [];
+  function gtag(){dataLayer.push(arguments);}
+  gtag('js', new Date());
+
+  gtag('config', 'G-KR7X84HFYE');
+</script>
+<body>
+    <div class="container py-5">
+        <div class="text-center mb-5">
+            <h1 class="display-4 fw-bold text-dark">My Guitar Notes</h1>
+            <p class="lead text-muted">Organize, Learn, and Master Your Guitar Skills</p>
+        </div>
+
+        <div class="row justify-content-center">
+            <div class="col-md-4 mb-4">
+                <div class="card card-hover text-center p-4 border-0 shadow-sm">
+                    <div class="card-body">
+                        <i class="bi bi-graph-up-arrow text-primary display-4 mb-3"></i>
+                        <h3 class="card-title">Scales</h3>
+                        <p class="card-text text-muted">
+                            Track and master guitar scales across different modes and keys
+                        </p>
+                        <a href="scales" class="btn btn-outline-primary mt-3">
+                                Explore Scales <i class="bi bi-arrow-right"></i>
+                        </a>
+                    </div>
+                </div>
+            </div>
+
+            <div class="col-md-4 mb-4">
+                <div class="card card-hover text-center p-4 border-0 shadow-sm">
+                    <div class="card-body">
+                        <i class="bi bi-music-note-beamed text-success display-4 mb-3"></i>
+                        <h3 class="card-title">Capo Transpose</h3>
+                        <p class="card-text text-muted">
+                            Easily transpose and calculate chord positions with capo
+                        </p>
+                        <!-- In the Capo Transpose section -->
+                        <a href="capo-transpose" class="btn btn-outline-success mt-3">
+                            Transpose Chords <i class="bi bi-arrow-right"></i>
+                        </a>
+                    </div>
+                </div>
+            </div>
+
+            <div class="col-md-4 mb-4">
+                <div class="card card-hover text-center p-4 border-0 shadow-sm">
+                    <div class="card-body">
+                        <i class="bi bi-journal-text text-warning display-4 mb-3"></i>
+                        <h3 class="card-title">Chord Library</h3>
+                        <p class="card-text text-muted">
+                            Identify Notes in a Chord and find Chord Family
+                        </p>
+                       <a href="chord-library" class="btn btn-outline-warning mt-3">
+                            View Chords <i class="bi bi-arrow-right"></i>
+                        </a>
+                    </div>
+                </div>
+            </div>
+        </div>
+        <div id="fretboard-container">
+        <div class="fret-numbers top-numbers">
+            <div class="fret-number">0</div>
+            <div class="fret-number">1</div>
+            <div class="fret-number">2</div>
+            <div class="fret-number">3</div>
+            <div class="fret-number">4</div>
+            <div class="fret-number">5</div>
+            <div class="fret-number">6</div>
+            <div class="fret-number">7</div>
+            <div class="fret-number">8</div>
+            <div class="fret-number">9</div>
+            <div class="fret-number">10</div>
+            <div class="fret-number">11</div>
+            <div class="fret-number">12</div>
+        </div>
+        <div id="full-fretboard"></div>
+        <div class="fret-numbers bottom-numbers">
+            <div class="fret-number">0</div>
+            <div class="fret-number">1</div>
+            <div class="fret-number">2</div>
+            <div class="fret-number">3</div>
+            <div class="fret-number">4</div>
+            <div class="fret-number">5</div>
+            <div class="fret-number">6</div>
+            <div class="fret-number">7</div>
+            <div class="fret-number">8</div>
+            <div class="fret-number">9</div>
+            <div class="fret-number">10</div>
+            <div class="fret-number">11</div>
+            <div class="fret-number">12</div>
+        </div>
+        </div>
+    </div>
+
+
+<!-- Add this style to your existing <style> section -->
+<style>
+        #fretboard-container {
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+        }
+        #full-fretboard {
+            width: 100%;
+            background-color: #f4e4d0;
+            border: 3px solid #8B4513;
+            display: flex;
+            flex-direction: column;
+            position: relative;
+        }
+        .fret-numbers {
+            display: flex;
+            width: 100%;
+            box-sizing: border-box;
+        }
+        .fret-number {
+            width: calc(100% / 12); /* Divide equally among 13 frets */
+            font-weight: bold;
+        }
+
+        .fret-numbers {
+            position: relative;
+            height: 30px;
+        }
+        .fret-number {
+            position: absolute;
+            width: 45px;
+            text-align: center;
+            transform: translateX(-50%);
+        }
+        .top-numbers .fret-number:nth-child(1) { left: 0%; }
+        .top-numbers .fret-number:nth-child(2) { left: 8.33%; }
+        .top-numbers .fret-number:nth-child(3) { left: 16.67%; }
+        .top-numbers .fret-number:nth-child(4) { left: 25%; }
+        .top-numbers .fret-number:nth-child(5) { left: 33.33%; }
+        .top-numbers .fret-number:nth-child(6) { left: 41.67%; }
+        .top-numbers .fret-number:nth-child(7) { left: 50%; }
+        .top-numbers .fret-number:nth-child(8) { left: 58.33%; }
+        .top-numbers .fret-number:nth-child(9) { left: 66.67%; }
+        .top-numbers .fret-number:nth-child(10) { left: 75%; }
+        .top-numbers .fret-number:nth-child(11) { left: 83.33%; }
+        .top-numbers .fret-number:nth-child(12) { left: 91.67%; }
+        .top-numbers .fret-number:nth-child(13) { left: 100%; }
+
+        /* Duplicate for bottom numbers */
+        .bottom-numbers .fret-number:nth-child(1) { left: 0%; }
+        .bottom-numbers .fret-number:nth-child(2) { left: 8.33%; }
+        .bottom-numbers .fret-number:nth-child(3) { left: 16.67%; }
+        .bottom-numbers .fret-number:nth-child(4) { left: 25%; }
+        .bottom-numbers .fret-number:nth-child(5) { left: 33.33%; }
+        .bottom-numbers .fret-number:nth-child(6) { left: 41.67%; }
+        .bottom-numbers .fret-number:nth-child(7) { left: 50%; }
+        .bottom-numbers .fret-number:nth-child(8) { left: 58.33%; }
+        .bottom-numbers .fret-number:nth-child(9) { left: 66.67%; }
+        .bottom-numbers .fret-number:nth-child(10) { left: 75%; }
+        .bottom-numbers .fret-number:nth-child(11) { left: 83.33%; }
+        .bottom-numbers .fret-number:nth-child(12) { left: 91.67%; }
+        .bottom-numbers .fret-number:nth-child(13) { left: 100%; }
+
+        .full-guitar-string {
+            height: 50px;
+            border-bottom: 1px solid #333;
+            position: relative;
+            display: flex;
+        }
+        .full-note-marker {
+            position: absolute;
+            width: 45px;
+            height: 45px;
+            border-radius: 50%;
+            top: 0;
+            transform: translateX(-50%);
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            color: white;
+            font-weight: bold;
+            z-index: 20;
+            border: 2px solid;
+            font-size: 16px;
+        }
+        .natural-note {
+            background-color: rgba(0,128,0,0.7);
+            border-color: darkgreen;
+        }
+        .accidental-note {
+            background-color: rgba(0,0,255,0.7);
+            border-color: darkblue;
+        }
+</style>
+
+
+
+<!-- Add this script to your existing <script> section -->
+<script>
+        const ChromaticScale = ['C', 'C#', 'D', 'D#', 'E', 'F', 'F#', 'G', 'G#', 'A', 'A#', 'B'];
+
+        function isNaturalNote(note) {
+            const naturalNotes = ['C', 'D', 'E', 'F', 'G', 'A', 'B'];
+            return naturalNotes.includes(note);
+        }
+
+const FretPositions = [
+    0,      // Open string
+    8.33,   // 1st fret
+    16.67,  // 2nd fret
+    25,     // 3rd fret
+    33.33,  // 4th fret
+    41.67,  // 5th fret
+    50,     // 6th fret
+    58.33,  // 7th fret
+    66.67,  // 8th fret
+    75,     // 9th fret
+    83.33,  // 10th fret
+    91.67,  // 11th fret
+    100     // 12th fret
+];
+
+function createNoteMarker(stringEl, note, fret) {
+    const noteMarker = document.createElement('div');
+    noteMarker.className = 'full-note-marker';
+    noteMarker.textContent = note;
+
+    noteMarker.classList.add(
+        isNaturalNote(note) ? 'natural-note' : 'accidental-note'
+    );
+
+    // Use precise percentage positioning
+    noteMarker.style.left = `${FretPositions[fret]}%`;
+
+    stringEl.appendChild(noteMarker);
+}
+
+function createFullFretboard() {
+    const fretboardEl = document.getElementById('full-fretboard');
+    const guitarStrings = ['E', 'B', 'G', 'D', 'A', 'E'];
+
+    guitarStrings.forEach((stringNote) => {
+        const stringEl = document.createElement('div');
+        stringEl.className = 'full-guitar-string';
+
+        // Create note markers for each fret (0 to 12)
+        for (let fret = 0; fret <= 12; fret++) {
+            const noteIndex = (ChromaticScale.indexOf(stringNote) + fret) % 12;
+            const note = ChromaticScale[noteIndex];
+
+            createNoteMarker(stringEl, note, fret);
+        }
+
+        fretboardEl.appendChild(stringEl);
+    });
+}
+
+        createFullFretboard();
+    </script>
+
+<!-- In the Chord Library section -->
+
+
+    <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.2.3/dist/js/bootstrap.bundle.min.js"></script>
+</body>
+</html>
