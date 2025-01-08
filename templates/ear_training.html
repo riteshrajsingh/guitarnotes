@@ -1,0 +1,471 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Guitar Ear Training</title>
+    <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.2.3/dist/css/bootstrap.min.css" rel="stylesheet">
+    <link href="https://cdn.jsdelivr.net/npm/bootstrap-icons@1.10.0/font/bootstrap-icons.css" rel="stylesheet">
+    <style>
+        body {
+            background-color: #f4f4f4;
+            font-family: 'Arial', sans-serif;
+        }
+        #ear-training-container {
+            max-width: 800px;
+            margin: 0 auto;
+            padding: 20px;
+        }
+        #challenge-display {
+            text-align: center;
+            margin-bottom: 20px;
+            font-size: 24px;
+            font-weight: bold;
+            min-height: 50px;
+        }
+        #note-reveal {
+            font-size: 36px;
+            color: #007bff;
+            text-align: center;
+            margin-bottom: 20px;
+        }
+        /* Reuse existing fretboard styles from previous implementation */
+        .full-guitar-string {
+            height: 50px;
+            border-bottom: 1px solid #333;
+            position: relative;
+            display: flex;
+        }
+        .full-note-marker {
+            position: absolute;
+            width: 45px;
+            height: 45px;
+            border-radius: 50%;
+            top: 0;
+            transform: translateX(-50%);
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            color: white;
+            font-weight: bold;
+            z-index: 20;
+            border: 2px solid;
+            font-size: 16px;
+            cursor: pointer;
+            transition: transform 0.2s ease;
+        }
+        .full-note-marker:hover {
+            transform: scale(1.1);
+        }
+        .natural-note {
+            background-color: rgba(0,128,0,0.7);
+            border-color: darkgreen;
+        }
+        .accidental-note {
+            background-color: rgba(0,0,255,0.7);
+            border-color: darkblue;
+        }
+            #note-info-container {
+                width: 100%;
+                background-color: #f8f9fa;
+                border: 1px solid #dee2e6;
+                border-radius: 8px;
+                padding: 15px;
+                margin-bottom: 20px;
+                display: flex;
+                justify-content: space-around;
+                flex-wrap: wrap;
+            }
+            .note-info-card {
+                background-color: white;
+                border: 1px solid #e9ecef;
+                border-radius: 5px;
+                padding: 10px;
+                margin: 5px;
+                text-align: center;
+                min-width: 150px;
+                box-shadow: 0 2px 4px rgba(0,0,0,0.1);
+            }
+            .note-info-label {
+                font-weight: bold;
+                color: #6c757d;
+                margin-bottom: 5px;
+            }
+            .note-info-value {
+                font-size: 1.2em;
+                color: #343a40;
+            }
+
+        #fretboard-container {
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+        }
+        #full-fretboard {
+            width: 100%;
+            background-color: #f4e4d0;
+            border: 3px solid #8B4513;
+            display: flex;
+            flex-direction: column;
+            position: relative;
+        }
+        .fret-numbers {
+            display: flex;
+            width: 100%;
+            box-sizing: border-box;
+        }
+        .fret-number {
+            width: calc(100% / 12); /* Divide equally among 13 frets */
+            font-weight: bold;
+        }
+
+        .fret-numbers {
+            position: relative;
+            height: 30px;
+        }
+        .fret-number {
+            position: absolute;
+            width: 45px;
+            text-align: center;
+            transform: translateX(-50%);
+        }
+        .top-numbers .fret-number:nth-child(1) { left: 0%; }
+        .top-numbers .fret-number:nth-child(2) { left: 8.33%; }
+        .top-numbers .fret-number:nth-child(3) { left: 16.67%; }
+        .top-numbers .fret-number:nth-child(4) { left: 25%; }
+        .top-numbers .fret-number:nth-child(5) { left: 33.33%; }
+        .top-numbers .fret-number:nth-child(6) { left: 41.67%; }
+        .top-numbers .fret-number:nth-child(7) { left: 50%; }
+        .top-numbers .fret-number:nth-child(8) { left: 58.33%; }
+        .top-numbers .fret-number:nth-child(9) { left: 66.67%; }
+        .top-numbers .fret-number:nth-child(10) { left: 75%; }
+        .top-numbers .fret-number:nth-child(11) { left: 83.33%; }
+        .top-numbers .fret-number:nth-child(12) { left: 91.67%; }
+        .top-numbers .fret-number:nth-child(13) { left: 100%; }
+
+        /* Duplicate for bottom numbers */
+        .bottom-numbers .fret-number:nth-child(1) { left: 0%; }
+        .bottom-numbers .fret-number:nth-child(2) { left: 8.33%; }
+        .bottom-numbers .fret-number:nth-child(3) { left: 16.67%; }
+        .bottom-numbers .fret-number:nth-child(4) { left: 25%; }
+        .bottom-numbers .fret-number:nth-child(5) { left: 33.33%; }
+        .bottom-numbers .fret-number:nth-child(6) { left: 41.67%; }
+        .bottom-numbers .fret-number:nth-child(7) { left: 50%; }
+        .bottom-numbers .fret-number:nth-child(8) { left: 58.33%; }
+        .bottom-numbers .fret-number:nth-child(9) { left: 66.67%; }
+        .bottom-numbers .fret-number:nth-child(10) { left: 75%; }
+        .bottom-numbers .fret-number:nth-child(11) { left: 83.33%; }
+        .bottom-numbers .fret-number:nth-child(12) { left: 91.67%; }
+        .bottom-numbers .fret-number:nth-child(13) { left: 100%; }
+
+        .full-guitar-string {
+            height: 50px;
+            border-bottom: 1px solid #333;
+            position: relative;
+            display: flex;
+        }
+        .full-note-marker {
+            position: absolute;
+            width: 45px;
+            height: 45px;
+            border-radius: 50%;
+            top: 0;
+            transform: translateX(-50%);
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            color: white;
+            font-weight: bold;
+            z-index: 20;
+            border: 2px solid;
+            font-size: 16px;
+        }
+        .natural-note {
+            background-color: rgba(0,128,0,0.7);
+            border-color: darkgreen;
+        }
+        .accidental-note {
+            background-color: rgba(0,0,255,0.7);
+            border-color: darkblue;
+        }
+
+        .full-note-marker {
+            cursor: pointer;
+            transition: transform 0.2s ease-in-out;
+        }
+        .full-note-marker:hover {
+            transform: scale(1);
+            transform-origin: center;
+        }
+
+        .full-note-marker.natural-note {
+            background-color: rgba(0,128,0,0.7);
+            border-color: darkgreen;
+        }
+
+        .full-note-marker.accidental-note {
+            background-color: rgba(0,0,255,0.7);
+            border-color: darkblue;
+        }
+
+</style>
+
+</head>
+<body>
+    <div id="ear-training-container" class="container">
+        <div class="row">
+            <div class="col-12">
+                <div class="text-center mb-5">
+                            <h1 class="text-center mb-4">Guitar Ear Training</h1>
+                    <a href="{{ url_for('index') }}" class="btn btn-outline-warning mt-3">
+                        <i class="bi bi-arrow-left"></i> Back to Home
+                    </a>
+                </div>
+
+
+                <div id="challenge-display">
+                    Click 'Play Note' to start
+                </div>
+
+                <div id="note-reveal" class="mb-3">
+                    <!-- Note will be revealed here -->
+                </div>
+
+                <div class="text-center mb-3">
+                    <button id="play-note-btn" class="btn btn-primary me-2">
+                        <i class="bi bi-play-fill"></i> Play Note
+                    </button>
+                    <button id="reveal-note-btn" class="btn btn-secondary">
+                        <i class="bi bi-eye-fill"></i> Reveal Note
+                    </button>
+                </div>
+
+                <!-- Fretboard Container -->
+                <div id="fretboard-container">
+                    <div class="fret-numbers top-numbers">
+                        <div class="fret-number">0</div>
+                        <div class="fret-number">1</div>
+                        <div class="fret-number">2</div>
+                        <div class="fret-number">3</div>
+                        <div class="fret-number">4</div>
+                        <div class="fret-number">5</div>
+                        <div class="fret-number">6</div>
+                        <div class="fret-number">7</div>
+                        <div class="fret-number">8</div>
+                        <div class="fret-number">9</div>
+                        <div class="fret-number">10</div>
+                        <div class="fret-number">11</div>
+                        <div class="fret-number">12</div>
+                    </div>
+                    <div id="full-fretboard"></div>
+                    <div class="fret-numbers bottom-numbers">
+                        <div class="fret-number">0</div>
+                        <div class="fret-number">1</div>
+                        <div class="fret-number">2</div>
+                        <div class="fret-number">3</div>
+                        <div class="fret-number">4</div>
+                        <div class="fret-number">5</div>
+                        <div class="fret-number">6</div>
+                        <div class="fret-number">7</div>
+                        <div class="fret-number">8</div>
+                        <div class="fret-number">9</div>
+                        <div class="fret-number">10</div>
+                        <div class="fret-number">11</div>
+                        <div class="fret-number">12</div>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <script>
+        // Reuse existing constants
+        const ChromaticScale = ['C', 'C#', 'D', 'D#', 'E', 'F', 'F#', 'G', 'G#', 'A', 'A#', 'B'];
+        const FretPositions = [0, 8.33, 16.67, 25, 33.33, 41.67, 50, 58.33, 66.67, 75, 83.33, 91.67, 100];
+
+        class EarTrainingGame {
+            constructor() {
+                this.currentChallenge = null;
+                this.guitarSamples = {};
+                this.audioContext = null;
+            }
+
+            initAudioContext() {
+                if (!this.audioContext) {
+                    this.audioContext = new (window.AudioContext || window.webkitAudioContext)();
+                }
+            }
+
+            loadGuitarSamples() {
+                const strings = ['E1', 'B2', 'G3', 'D4', 'A5', 'E6'];
+
+                const loadPromises = strings.map(stringFolder => {
+                    const frets = Array.from({length: 13}, (_, i) => i);
+
+                    return frets.map(fret => {
+                        const samplePath = `/guitar-samples/${stringFolder}/${fret}.m4a`;
+
+                        return fetch(samplePath)
+                            .then(response => {
+                                if (!response.ok) {
+                                    console.warn(`Could not load sample: ${samplePath}`);
+                                    return null;
+                                }
+                                return response.arrayBuffer();
+                            })
+                            .then(arrayBuffer => {
+                                if (!arrayBuffer) return null;
+
+                                return new Promise((resolve, reject) => {
+                                    this.audioContext.decodeAudioData(
+                                        arrayBuffer,
+                                        (buffer) => resolve(buffer),
+                                        (error) => {
+                                            console.error(`Decoding error for ${samplePath}:`, error);
+                                            reject(error);
+                                        }
+                                    );
+                                });
+                            })
+                            .then(audioBuffer => {
+                                if (audioBuffer) {
+                                    if (!this.guitarSamples[stringFolder]) {
+                                        this.guitarSamples[stringFolder] = {};
+                                    }
+                                    this.guitarSamples[stringFolder][fret] = audioBuffer;
+                                }
+                            })
+                            .catch(error => {
+                                console.error(`Complete error for ${samplePath}:`, error);
+                            });
+                    });
+                }).flat();
+
+                return Promise.allSettled(loadPromises);
+            }
+
+            generateChallenge() {
+                const strings = ['E1', 'B2', 'G3', 'D4', 'A5', 'E6'];
+                const randomStringIndex = Math.floor(Math.random() * strings.length);
+                const randomFret = Math.floor(Math.random() * 13);
+
+                const stringFolder = strings[randomStringIndex];
+                const noteIndex = (ChromaticScale.indexOf(stringFolder[0]) + randomFret) % 12;
+                const note = ChromaticScale[noteIndex];
+
+                return {
+                    stringFolder,
+                    fret: randomFret,
+                    note
+                };
+            }
+
+            playChallenge(challenge) {
+                this.initAudioContext();
+
+                if (this.guitarSamples[challenge.stringFolder] &&
+                    this.guitarSamples[challenge.stringFolder][challenge.fret]) {
+
+                    const source = this.audioContext.createBufferSource();
+                    source.buffer = this.guitarSamples[challenge.stringFolder][challenge.fret];
+
+                    const gainNode = this.audioContext.createGain();
+                    gainNode.gain.setValueAtTime(0.7, this.audioContext.currentTime);
+
+                    source.connect(gainNode);
+                    gainNode.connect(this.audioContext.destination);
+
+                    source.start();
+                }
+            }
+        }
+
+        // Initialize Game and Fretboard
+        document.addEventListener('DOMContentLoaded', () => {
+            const game = new EarTrainingGame();
+            const challengeDisplay = document.getElementById('challenge-display');
+            const noteReveal = document.getElementById('note-reveal');
+            const playNoteBtn = document.getElementById('play-note-btn');
+            const revealNoteBtn = document.getElementById('reveal-note-btn');
+
+            // Load samples first
+            game.initAudioContext();
+            game.loadGuitarSamples().then(() => {
+                playNoteBtn.disabled = false;
+                console.log('Guitar samples loaded successfully');
+            });
+
+            let currentChallenge = null;
+
+            // Play Note Button
+            playNoteBtn.addEventListener('click', () => {
+                currentChallenge = game.generateChallenge();
+                challengeDisplay.textContent = 'Listen carefully...';
+                noteReveal.textContent = '';
+                game.playChallenge(currentChallenge);
+            });
+
+            // Reveal Note Button
+            revealNoteBtn.addEventListener('click', () => {
+                if (currentChallenge) {
+                    noteReveal.textContent = `Note was: ${currentChallenge.note}`;
+                }
+            });
+
+            // Create Fretboard (reusing previous implementation)
+            const fretboardEl = document.getElementById('full-fretboard');
+            const guitarStrings = ['E', 'B', 'G', 'D', 'A', 'E'];
+
+            guitarStrings.forEach((stringNote, stringIndex) => {
+                const stringEl = document.createElement('div');
+                stringEl.className = 'full-guitar-string';
+
+                for (let fret = 0; fret <= 12; fret++) {
+                    const noteIndex = (ChromaticScale.indexOf(stringNote) + fret) % 12;
+                    const note = ChromaticScale[noteIndex];
+
+                    const noteMarker = document.createElement('div');
+                    noteMarker.className = 'full-note-marker';
+                    noteMarker.textContent = note;
+                    noteMarker.classList.add(
+                        ChromaticScale.indexOf(note) % 2 === 0 ? 'natural-note' : 'accidental-note'
+                    );
+                    noteMarker.style.left = `${FretPositions[fret]}%`;
+
+                    // Reuse the playNote functionality from previous implementation
+                    noteMarker.addEventListener('click', () => {
+                        const stringFolderMap = {
+                            'E': stringIndex === 0 ? 'E6' : 'E1',
+                            'B': 'B2',
+                            'G': 'G3',
+                            'D': 'D4',
+                            'A': 'A5'
+                        };
+
+                        const stringFolder = stringFolderMap[stringNote];
+
+                        if (game.guitarSamples[stringFolder] &&
+                            game.guitarSamples[stringFolder][fret]) {
+
+                            const source = game.audioContext.createBufferSource();
+                            source.buffer = game.guitarSamples[stringFolder][fret];
+
+                            const gainNode = game.audioContext.createGain();
+                            gainNode.gain.setValueAtTime(0.7, game.audioContext.currentTime);
+
+                            source.connect(gainNode);
+                            gainNode.connect(game.audioContext.destination);
+
+                            source.start();
+                        }
+                    });
+
+                    stringEl.appendChild(noteMarker);
+                }
+
+                fretboardEl.appendChild(stringEl);
+            });
+        });
+    </script>
+</body>
+</html>

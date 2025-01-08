@@ -7,6 +7,19 @@
     <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.2.3/dist/css/bootstrap.min.css" rel="stylesheet">
     <link href="https://cdn.jsdelivr.net/npm/bootstrap-icons@1.10.0/font/bootstrap-icons.css" rel="stylesheet">
     <style>
+
+/* Optional: Enhance select styling */
+.chord-type-select {
+    font-size: 0.9rem;
+}
+
+/* Responsive adjustments */
+@media (max-width: 768px) {
+    .chord-type-select {
+        font-size: 0.8rem;
+    }
+}
+
     .fretboard-container {
         display: flex;
         justify-content: center;
@@ -187,9 +200,9 @@
                             <div id="chord-family-notes" class="alert alert-success"></div>
                         </div>
 
-                        <div class="mb-4" id="chord-type-container" style="display: none;">
+                    <div class="mb-4" id="chord-type-container" style="display: none;">
                             <h5 class="text-muted mb-3">Select Chord Type:</h5>
-                            <div class="d-flex flex-wrap">
+                            <div class="row g-3">
                                 {% set chord_categories = {
                                     'Basic Chords': [
                                         'Major', 'Minor', 'Diminished', 'Augmented', 'Suspended2', 'Suspended4'
@@ -219,20 +232,18 @@
                                 } %}
 
                                 {% for category, chords in chord_categories.items() %}
-                                    <div class="chord-category mb-4">
-                                        <h6 class="text-primary">{{ category }}</h6>
-                                        <div class="d-flex flex-wrap">
+                                    <div class="col-md-3 mb-3">
+                                        <label class="form-label">{{ category }}</label>
+                                        <select class="form-select chord-type-select" data-category="{{ category }}">
+                                            <option value="">Select {{ category }}</option>
                                             {% for chord in chords %}
-                                                <button class="btn btn-outline-success chord-type-btn" data-type="{{ chord }}">
-                                                    {{ chord }}
-                                                </button>
+                                                <option value="{{ chord }}">{{ chord }}</option>
                                             {% endfor %}
-                                        </div>
+                                        </select>
                                     </div>
                                 {% endfor %}
                             </div>
                         </div>
-
 
                         <!-- Chord Details -->
                         <div id="chord-details" class="mt-4" style="display: none;">
@@ -437,13 +448,22 @@ const ChordTheory = {
 };
 
 
-        let selectedRoot = null;
+        // Modify the chord type selection logic
+const chordTypeSelects = document.querySelectorAll('.chord-type-select');
 
-        // Root Note Selection
+// Reset all selects when a new root note is selected
+function resetChordTypeSelects() {
+    chordTypeSelects.forEach(select => {
+        select.selectedIndex = 0;
+    });
+}
+
+// Root Note Selection
 document.querySelectorAll('.root-note-btn').forEach(btn => {
     btn.addEventListener('click', function() {
         document.getElementById('chord-family-section').style.display = 'none';
         document.getElementById('fretboard-section').style.display = 'none';
+
         // Remove active state from all root note buttons
         document.querySelectorAll('.root-note-btn').forEach(b => {
             b.classList.remove('btn-primary');
@@ -459,17 +479,34 @@ document.querySelectorAll('.root-note-btn').forEach(btn => {
         document.getElementById('chord-details').style.display = 'none';
         document.getElementById('scale-section').style.display = 'none';
 
+        // Reset chord type selects
+        resetChordTypeSelects();
+
         // Store selected root
         selectedRoot = this.dataset.note;
 
         // Display scale
         displayScale(selectedRoot);
+    });
+});
 
-        // Reset chord type selection
-        document.querySelectorAll('.chord-type-btn').forEach(b => {
-            b.classList.remove('btn-success');
-            b.classList.add('btn-outline-success');
-        });
+// Chord Type Selection with Multiple Selects
+chordTypeSelects.forEach(select => {
+    select.addEventListener('change', function() {
+        const selectedChordType = this.value;
+        const category = this.dataset.category;
+
+        if (selectedChordType) {
+            // Deselect other selects in the same category
+            chordTypeSelects.forEach(otherSelect => {
+                if (otherSelect !== this && otherSelect.dataset.category === category) {
+                    otherSelect.selectedIndex = 0;
+                }
+            });
+
+            // Calculate and display chord
+            displayChordDetails(selectedRoot, selectedChordType);
+        }
     });
 });
 
@@ -527,27 +564,57 @@ document.querySelectorAll('.chord-type-btn').forEach(btn => {
     chordFamilyNotesEl.textContent = chordFamilyText;
     chordFamilySection.style.display = 'block';
 }
-        function displayChordDetails(rootNote, chordType) {
-            if (!rootNote || !chordType) return;
 
-            const chordDetailsContainer = document.getElementById('chord-details');
-            const chordNameEl = document.getElementById('selected-chord-name');
-            const chordNotationEl = document.getElementById('chord-notation');
-            const chordNotesEl = document.getElementById('chord-notes');
 
-            const chordInfo = ChordTheory[chordType];
+function displayChordDetails(rootNote, chordType) {
+    // Handle special cases or rename some chords to match ChordTheory keys
+    const chordTypeMapping = {
+        'Half-Diminished7': 'HalfDiminished7',
+        'Dominant7♭9': 'Dominant7Flat9',
+        'Dominant7♯9': 'Dominant7Sharp9',
+        'Dominant7♭5': 'Dominant7Flat5',
+        'Dominant7♯5': 'Dominant7Sharp5',
+        'Major7♯11': 'Major7Sharp11',
+        'Minor7♭5': 'Minor7Flat5',
+        'Power (C5)': 'Power',
+        'Major with Bass': 'MajorWithBass',
+        'Minor with Bass': 'MinorWithBass',
+        'Phrygian Dominant': 'PhrygianDominant',
+        'Altered Dominant': 'AlteredDominant'
 
-            const chordNotes = chordInfo.intervals.map(interval =>
-                ChromaticScale[(ChromaticScale.indexOf(rootNote) + interval) % 12]
-            );
+    };
 
-            chordNameEl.textContent = `${rootNote} ${chordType}`;
-            chordNotationEl.textContent = `Notation: ${chordInfo.notation}`;
-            chordNotesEl.textContent = `Notes: ${chordNotes.join(', ')}`;
+    // Normalize the chord type
+    const normalizedChordType = chordTypeMapping[chordType] || chordType;
 
-            chordDetailsContainer.style.display = 'block';
-            generateFretboardVoicing(rootNote, chordType);
-        }
+    // Check if the chord exists in ChordTheory
+    if (!ChordTheory[normalizedChordType]) {
+        console.error(`Chord type not found: ${chordType}`);
+        alert(`Chord type "${chordType}" is not currently supported.`);
+        return;
+    }
+
+    if (!rootNote || !normalizedChordType) return;
+
+    const chordDetailsContainer = document.getElementById('chord-details');
+    const chordNameEl = document.getElementById('selected-chord-name');
+    const chordNotationEl = document.getElementById('chord-notation');
+    const chordNotesEl = document.getElementById('chord-notes');
+
+    const chordInfo = ChordTheory[normalizedChordType];
+
+    const chordNotes = chordInfo.intervals.map(interval =>
+        ChromaticScale[(ChromaticScale.indexOf(rootNote) + interval) % 12]
+    );
+
+    chordNameEl.textContent = `${rootNote} ${chordType}`;
+    chordNotationEl.textContent = `Notation: ${chordInfo.notation}`;
+    chordNotesEl.textContent = `Notes: ${chordNotes.join(', ')}`;
+
+    chordDetailsContainer.style.display = 'block';
+    generateFretboardVoicing(rootNote, normalizedChordType);
+}
+
 
 function generateFretboardVoicing(rootNote, chordType) {
     const fretboardSection = document.getElementById('fretboard-section');
@@ -619,6 +686,17 @@ function generateFretboardVoicing(rootNote, chordType) {
     fretboardSection.style.display = 'block';
 }
 
+// Replace the previous chord type selection event listeners with:
+const chordTypeSelect = document.getElementById('chord-type-select');
+
+chordTypeSelect.addEventListener('change', function() {
+    const selectedChordType = this.value;
+
+    if (selectedChordType) {
+        // Calculate and display chord
+        displayChordDetails(selectedRoot, selectedChordType);
+    }
+});
 
 
 

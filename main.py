@@ -1,4 +1,5 @@
-from flask import Flask, render_template, request
+from flask import Flask, render_template, request, send_from_directory
+import os
 
 app = Flask(__name__)
 
@@ -58,6 +59,24 @@ def index():
 def scales():
     return render_template('scales.html')
 
+@app.route('/guitar-samples/<string:string_folder>/<path:filename>')
+def serve_guitar_sample(string_folder, filename):
+    print(string_folder)
+    samples_dir = os.path.join(os.path.dirname(__file__), 'guitar-samples')
+
+    try:
+        return send_from_directory(
+            os.path.join(samples_dir, string_folder),
+            filename
+        )
+    except FileNotFoundError:
+        return "Sample not found", 404
+
+@app.route('/ear-training')
+def ear_training():
+    return render_template('ear_training.html')
+
+
 @app.route("/capo-transpose", methods=["GET", "POST"])
 def capo_transposer():
     capo_positions = None
@@ -76,4 +95,4 @@ def chord_library():
 
 
 if __name__ == "__main__":
-    app.run(debug=True)
+    app.run(debug=True,host='0.0.0.0', port=5001)
