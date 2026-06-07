@@ -1,0 +1,113 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Capo Transpose</title>
+    <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.2.3/dist/css/bootstrap.min.css" rel="stylesheet">
+    <link href="https://cdn.jsdelivr.net/npm/bootstrap-icons@1.10.0/font/bootstrap-icons.css" rel="stylesheet">
+    <style>
+        body {
+            background-color: #f4f4f4;
+            font-family: 'Arial', sans-serif;
+        }
+        .chord-checkbox {
+            margin-bottom: 10px;
+        }
+    </style>
+</head>
+<!-- Google tag (gtag.js) -->
+<script async src="https://www.googletagmanager.com/gtag/js?id=G-KR7X84HFYE"></script>
+<script>
+  window.dataLayer = window.dataLayer || [];
+  function gtag(){dataLayer.push(arguments);}
+  gtag('js', new Date());
+
+  gtag('config', 'G-KR7X84HFYE');
+</script>
+<body>
+    <div class="container py-5">
+        <div class="text-center mb-5">
+            <h1 class="display-4 fw-bold text-dark">Capo Transpose</h1>
+            <p class="lead text-muted">Easily Transpose and Calculate Chord Positions</p>
+            <a href="{{ url_for('index') }}" class="btn btn-outline-success mt-3">
+                <i class="bi bi-arrow-left"></i> Back to Home
+            </a>
+        </div>
+
+        <div class="row justify-content-center">
+            <div class="col-md-10">
+                <div class="card border-0 shadow-sm">
+                    <div class="card-body">
+                        <h3 class="card-title text-success mb-4">
+                            <i class="bi bi-music-note-beamed me-2"></i>Capo Calculator
+                        </h3>
+
+                        {% if error %}
+                            <div class="alert alert-danger" role="alert">
+                                {{ error }}
+                            </div>
+                        {% endif %}
+
+                        <form method="POST">
+                            <div class="mb-4">
+                                <h5 class="text-muted mb-3">Select Chords:</h5>
+                                <div class="row">
+                                    {% set chords = [
+                                        'A', 'A#', 'B', 'C', 'C#', 'D', 'D#', 'E', 'F', 'F#', 'G', 'G#',
+                                        'Am', 'A#m', 'Bm', 'Cm', 'C#m', 'Dm', 'D#m', 'Em', 'Fm', 'F#m', 'Gm', 'G#m'
+                                    ] %}
+                                    {% for chord in chords %}
+                                        <div class="col-4 col-md-2 chord-checkbox">
+                                            <div class="form-check">
+                                                <input class="form-check-input" type="checkbox"
+                                                       name="chords"
+                                                       value="{{ chord }}"
+                                                       id="chord-{{ chord }}"
+                                                       {% if selected_chords and chord in selected_chords %}checked{% endif %}>
+                                                <label class="form-check-label" for="chord-{{ chord }}">
+                                                    {{ chord }}
+                                                </label>
+                                            </div>
+                                        </div>
+                                    {% endfor %}
+                                </div>
+                            </div>
+
+                            <div class="text-center">
+                                <button type="submit" class="btn btn-success">
+                                    Find Capo Positions <i class="bi bi-calculator ms-2"></i>
+                                </button>
+                            </div>
+                        </form>
+
+                        {% if selected_chords %}
+                            <div class="mt-4 bg-light p-3 rounded">
+                                <h5 class="text-muted">Your Selected Chords:</h5>
+                                <p class="text-success">{{ selected_chords | join(", ") }}</p>
+                            </div>
+                        {% endif %}
+
+                        {% if capo_positions %}
+                            <div class="mt-4">
+                                <h4 class="text-success mb-3">
+                                    <i class="bi bi-music-note me-2"></i>Capo Positions
+                                </h4>
+                                <div class="list-group">
+                                    {% for position in capo_positions %}
+                                        <div class="list-group-item list-group-item-action">
+                                            {{ position }}
+                                        </div>
+                                    {% endfor %}
+                                </div>
+                            </div>
+                        {% endif %}
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.2.3/dist/js/bootstrap.bundle.min.js"></script>
+</body>
+</html>

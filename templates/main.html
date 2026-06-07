@@ -1,0 +1,840 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+    <title>Guitar Notes Manager</title>
+    <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.2.3/dist/css/bootstrap.min.css" rel="stylesheet">
+    <link href="https://cdn.jsdelivr.net/npm/bootstrap-icons@1.10.0/font/bootstrap-icons.css" rel="stylesheet">
+    <style>
+        body {
+            background-color: #f4f4f4;
+            font-family: 'Arial', sans-serif;
+        }
+        .card-hover:hover {
+            transform: scale(1.05);
+            box-shadow: 0 10px 20px rgba(0,0,0,0.12);
+            transition: all 0.3s ease;
+        }
+    </style>
+</head>
+<!-- Google tag (gtag.js) -->
+<script async src="https://www.googletagmanager.com/gtag/js?id=G-KR7X84HFYE"></script>
+<script>
+  window.dataLayer = window.dataLayer || [];
+  function gtag(){dataLayer.push(arguments);}
+  gtag('js', new Date());
+
+  gtag('config', 'G-KR7X84HFYE');
+</script>
+<body>
+    <div class="container py-5">
+        <div class="text-center mb-5">
+            <h1 class="display-4 fw-bold text-dark">My Guitar Notes</h1>
+            <p class="lead text-muted">Organize, Learn, and Master Your Guitar Skills</p>
+        </div>
+
+        <div class="row justify-content-center">
+    <div class="col-md-6 mb-4">
+        <div class="row">
+            <div class="col-md-6 mb-4">
+                <div class="card card-hover text-center p-4 border-0 shadow-sm">
+                    <div class="card-body">
+                        <i class="bi bi-graph-up-arrow text-primary display-4 mb-3"></i>
+                        <h3 class="card-title">Scales</h3>
+                        <p class="card-text text-muted">
+                            Track and master guitar scales across different modes and keys
+                        </p>
+                        <a href="scales" class="btn btn-outline-primary mt-3">
+                            Explore Scales <i class="bi bi-arrow-right"></i>
+                        </a>
+                    </div>
+                </div>
+            </div>
+            <div class="col-md-6 mb-4">
+                <div class="card card-hover text-center p-4 border-0 shadow-sm">
+                    <div class="card-body">
+                        <i class="bi bi-music-note-beamed text-success display-4 mb-3"></i>
+                        <h3 class="card-title">Capo Transpose</h3>
+                        <p class="card-text text-muted">
+                            Easily transpose and calculate chord positions with capo
+                        </p>
+                        <a href="capo-transpose" class="btn btn-outline-success mt-3">
+                            Transpose Chords <i class="bi bi-arrow-right"></i>
+                        </a>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+    <div class="col-md-6 mb-4">
+        <div class="row">
+            <div class="col-md-6 mb-4">
+                <div class="card card-hover text-center p-4 border-0 shadow-sm">
+                    <div class="card-body">
+                        <i class="bi bi-journal-text text-warning display-4 mb-3"></i>
+                        <h3 class="card-title">Chord Library</h3>
+                        <p class="card-text text-muted">
+                            Identify Notes in a Chord and find Chord Family
+                        </p>
+                        <a href="chord-library" class="btn btn-outline-warning mt-3">
+                            View Chords <i class="bi bi-arrow-right"></i>
+                        </a>
+                    </div>
+                </div>
+            </div>
+            <div class="col-md-6 mb-4">
+                <div class="card card-hover text-center p-4 border-0 shadow-sm">
+                    <div class="card-body">
+                        <i class="bi bi-headphones text-info display-4 mb-3"></i>
+                        <h3 class="card-title">Ear Training</h3>
+                        <p class="card-text text-muted">
+                            Develop your musical ear by identifying guitar notes and improving pitch recognition
+                        </p>
+                        <a href="ear-training" class="btn btn-outline-info mt-3">
+                            Start Training <i class="bi bi-music-note-beamed"></i>
+                        </a>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+
+        <style>
+            #note-info-container {
+                width: 100%;
+                background-color: #f8f9fa;
+                border: 1px solid #dee2e6;
+                border-radius: 8px;
+                padding: 15px;
+                margin-bottom: 20px;
+                display: flex;
+                justify-content: space-around;
+                flex-wrap: wrap;
+            }
+            .note-info-card {
+                background-color: white;
+                border: 1px solid #e9ecef;
+                border-radius: 5px;
+                padding: 10px;
+                margin: 5px;
+                text-align: center;
+                min-width: 150px;
+                box-shadow: 0 2px 4px rgba(0,0,0,0.1);
+            }
+            .note-info-label {
+                font-weight: bold;
+                color: #6c757d;
+                margin-bottom: 5px;
+            }
+            .note-info-value {
+                font-size: 1.2em;
+                color: #343a40;
+            }
+        </style>
+
+        <div id="note-info-container" class="d-none">
+            <div class="note-info-card">
+                <div class="note-info-label">Note</div>
+                <div id="selected-note" class="note-info-value">-</div>
+            </div>
+            <div class="note-info-card">
+                <div class="note-info-label">String</div>
+                <div id="selected-string" class="note-info-value">-</div>
+            </div>
+            <div class="note-info-card">
+                <div class="note-info-label">Fret</div>
+                <div id="selected-fret" class="note-info-value">-</div>
+            </div>
+            <div class="note-info-card">
+                <div class="note-info-label">Frequency (Hz)</div>
+                <div id="selected-frequency" class="note-info-value">-</div>
+            </div>
+            <div class="note-info-card">
+                <div class="note-info-label">Octave</div>
+                <div id="selected-octave" class="note-info-value">-</div>
+            </div>
+        </div>
+
+
+
+        <div id="fretboard-container">
+        <div class="fret-numbers top-numbers">
+            <div class="fret-number">0</div>
+            <div class="fret-number">1</div>
+            <div class="fret-number">2</div>
+            <div class="fret-number">3</div>
+            <div class="fret-number">4</div>
+            <div class="fret-number">5</div>
+            <div class="fret-number">6</div>
+            <div class="fret-number">7</div>
+            <div class="fret-number">8</div>
+            <div class="fret-number">9</div>
+            <div class="fret-number">10</div>
+            <div class="fret-number">11</div>
+            <div class="fret-number">12</div>
+        </div>
+        <div id="full-fretboard"></div>
+        <div class="fret-numbers bottom-numbers">
+            <div class="fret-number">0</div>
+            <div class="fret-number">1</div>
+            <div class="fret-number">2</div>
+            <div class="fret-number">3</div>
+            <div class="fret-number">4</div>
+            <div class="fret-number">5</div>
+            <div class="fret-number">6</div>
+            <div class="fret-number">7</div>
+            <div class="fret-number">8</div>
+            <div class="fret-number">9</div>
+            <div class="fret-number">10</div>
+            <div class="fret-number">11</div>
+            <div class="fret-number">12</div>
+        </div>
+        </div>
+    </div>
+
+
+<!-- Add this style to your existing <style> section -->
+<style>
+
+        #fretboard-container {
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+        }
+        #full-fretboard {
+            width: 100%;
+            background-color: #f4e4d0;
+            border: 3px solid #8B4513;
+            display: flex;
+            flex-direction: column;
+            position: relative;
+        }
+        .fret-numbers {
+            display: flex;
+            width: 100%;
+            box-sizing: border-box;
+        }
+        .fret-number {
+            width: calc(100% / 12); /* Divide equally among 13 frets */
+            font-weight: bold;
+        }
+
+        .fret-numbers {
+            position: relative;
+            height: 30px;
+        }
+
+        .fret-number {
+            position: absolute;
+            text-align: center;
+            transform: translateX(-50%);
+            font-weight: bold;
+            font-size: 14px;
+        }
+
+        .top-numbers .fret-number:nth-child(1) { left: 0%; }
+        .top-numbers .fret-number:nth-child(2) { left: 8.33%; }
+        .top-numbers .fret-number:nth-child(3) { left: 16.67%; }
+        .top-numbers .fret-number:nth-child(4) { left: 25%; }
+        .top-numbers .fret-number:nth-child(5) { left: 33.33%; }
+        .top-numbers .fret-number:nth-child(6) { left: 41.67%; }
+        .top-numbers .fret-number:nth-child(7) { left: 50%; }
+        .top-numbers .fret-number:nth-child(8) { left: 58.33%; }
+        .top-numbers .fret-number:nth-child(9) { left: 66.67%; }
+        .top-numbers .fret-number:nth-child(10) { left: 75%; }
+        .top-numbers .fret-number:nth-child(11) { left: 83.33%; }
+        .top-numbers .fret-number:nth-child(12) { left: 91.67%; }
+        .top-numbers .fret-number:nth-child(13) { left: 100%; }
+
+        /* Duplicate for bottom numbers */
+        .bottom-numbers .fret-number:nth-child(1) { left: 0%; }
+        .bottom-numbers .fret-number:nth-child(2) { left: 8.33%; }
+        .bottom-numbers .fret-number:nth-child(3) { left: 16.67%; }
+        .bottom-numbers .fret-number:nth-child(4) { left: 25%; }
+        .bottom-numbers .fret-number:nth-child(5) { left: 33.33%; }
+        .bottom-numbers .fret-number:nth-child(6) { left: 41.67%; }
+        .bottom-numbers .fret-number:nth-child(7) { left: 50%; }
+        .bottom-numbers .fret-number:nth-child(8) { left: 58.33%; }
+        .bottom-numbers .fret-number:nth-child(9) { left: 66.67%; }
+        .bottom-numbers .fret-number:nth-child(10) { left: 75%; }
+        .bottom-numbers .fret-number:nth-child(11) { left: 83.33%; }
+        .bottom-numbers .fret-number:nth-child(12) { left: 91.67%; }
+        .bottom-numbers .fret-number:nth-child(13) { left: 100%; }
+
+        .full-guitar-string {
+            height: 50px;
+            border-bottom: 1px solid #333;
+            position: relative;
+            display: flex;
+        }
+        .full-note-marker {
+            position: absolute;
+            width: 45px;
+            height: 45px;
+            border-radius: 50%;
+            top: 0;
+            transform: translateX(-50%);
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            color: white;
+            font-weight: bold;
+            z-index: 20;
+            border: 2px solid;
+            font-size: 16px;
+        }
+        .natural-note {
+            background-color: rgba(0,128,0,0.7);
+            border-color: darkgreen;
+        }
+        .accidental-note {
+            background-color: rgba(0,0,255,0.7);
+            border-color: darkblue;
+        }
+
+        .full-note-marker {
+            cursor: pointer;
+            transition: transform 0.2s ease-in-out;
+        }
+        .full-note-marker:hover {
+            transform: scale(1.1) translateX(-45%);
+        }
+
+        .full-note-marker.natural-note {
+            background-color: rgba(0,128,0,0.7);
+            border-color: darkgreen;
+        }
+
+        .full-note-marker.accidental-note {
+            background-color: rgba(0,0,255,0.7);
+            border-color: darkblue;
+        }
+
+</style>
+
+
+
+<!-- Add this script to your existing <script> section -->
+<script>
+        const ChromaticScale = ['C', 'C#', 'D', 'D#', 'E', 'F', 'F#', 'G', 'G#', 'A', 'A#', 'B'];
+
+
+const FretPositions = [
+    0,      // Open string
+    8.33,   // 1st fret
+    16.67,  // 2nd fret
+    25,     // 3rd fret
+    33.33,  // 4th fret
+    41.67,  // 5th fret
+    50,     // 6th fret
+    58.33,  // 7th fret
+    66.67,  // 8th fret
+    75,     // 9th fret
+    83.33,  // 10th fret
+    91.67,  // 11th fret
+    100     // 12th fret
+];
+
+function createNoteMarker(stringEl, note, fret) {
+    const noteMarker = document.createElement('div');
+    noteMarker.className = 'full-note-marker';
+    noteMarker.textContent = note;
+
+    noteMarker.classList.add(
+        isNaturalNote(note) ? 'natural-note' : 'accidental-note'
+    );
+
+    // Use precise percentage positioning
+    noteMarker.style.left = `${FretPositions[fret]}%`;
+
+    // Add click event to play note
+    noteMarker.addEventListener('click', () => {
+        const frequency = getNoteFrequency(stringNote, fret);
+        playNote(frequency);
+    });
+
+    stringEl.appendChild(noteMarker);
+}
+
+
+let guitarSamples = {};
+
+function loadGuitarSamples() {
+    const strings = ['E1', 'B2', 'G3', 'D4', 'A5', 'E6'];
+
+    // Ensure audio context is created
+    if (!audioContext) {
+        initAudioContext();
+    }
+
+    const loadPromises = strings.map(stringFolder => {
+        const frets = Array.from({length: 13}, (_, i) => i);
+
+        return frets.map(fret => {
+            const samplePath = `/guitar-samples/${stringFolder}/${fret}.m4a`;
+
+            return fetch(samplePath)
+                .then(response => {
+                    if (!response.ok) {
+                        console.warn(`Could not load sample: ${samplePath}`);
+                        return null;
+                    }
+                    return response.arrayBuffer();
+                })
+                .then(arrayBuffer => {
+                    if (!arrayBuffer) return null;
+
+                    // Add more detailed error handling for decoding
+                    return new Promise((resolve, reject) => {
+                        try {
+                            audioContext.decodeAudioData(
+                                arrayBuffer,
+                                (buffer) => resolve(buffer),
+                                (error) => {
+                                    console.error(`Decoding error for ${samplePath}:`, error);
+                                    reject(error);
+                                }
+                            );
+                        } catch (error) {
+                            console.error(`Decoding exception for ${samplePath}:`, error);
+                            reject(error);
+                        }
+                    });
+                })
+                .then(audioBuffer => {
+                    if (audioBuffer) {
+                        if (!guitarSamples[stringFolder]) {
+                            guitarSamples[stringFolder] = {};
+                        }
+                        guitarSamples[stringFolder][fret] = audioBuffer;
+                    }
+                })
+                .catch(error => {
+                    console.error(`Complete error for ${samplePath}:`, error);
+                });
+        });
+    }).flat();
+
+    return Promise.allSettled(loadPromises)
+        .then((results) => {
+            // Log successful and failed loads
+            const successfulLoads = results.filter(result => result.status === 'fulfilled');
+            const failedLoads = results.filter(result => result.status === 'rejected');
+
+            console.log('Sample Loading Summary:');
+            console.log(`Successful loads: ${successfulLoads.length}`);
+            console.log(`Failed loads: ${failedLoads.length}`);
+
+            // Log details of loaded samples
+            console.log('Loaded Samples:',
+                Object.keys(guitarSamples).map(string =>
+                    `${string} string: ${Object.keys(guitarSamples[string]).length} frets`
+                )
+            );
+
+            // Optional: Throw an error if no samples were loaded
+            if (Object.keys(guitarSamples).length === 0) {
+                throw new Error('No guitar samples could be loaded');
+            }
+        })
+        .catch(error => {
+            console.error('Critical error in sample loading:', error);
+            // Optionally, provide a fallback or notify the user
+            alert('Could not load guitar samples. Some features may be limited.');
+        });
+}
+
+// Ensure audio context is properly initialized
+function initAudioContext() {
+    // Check if AudioContext is supported
+    if (window.AudioContext || window.webkitAudioContext) {
+        audioContext = new (window.AudioContext || window.webkitAudioContext)();
+    } else {
+        console.error('Web Audio API is not supported in this browser');
+        alert('Your browser does not support audio playback.');
+    }
+}
+
+function playNote(frequency, stringNote, fret) {
+    // Mapping visual string names to sample folder names
+    const stringMap = {
+        'E': 'E6',   // Bottom (thickest) E string
+        'B': 'B2',
+        'G': 'G3',
+        'D': 'D4',
+        'A': 'A5',
+        'E_HIGH': 'E1'  // Top (thinnest) E string
+    };
+
+    // Ensure audio context is initialized
+    if (!audioContext) {
+        initAudioContext();
+    }
+
+    // Determine the correct string folder
+    const stringFolder = stringMap[stringNote];
+
+    // Check if sample exists
+    if (guitarSamples[stringFolder] && guitarSamples[stringFolder][fret] !== undefined) {
+        const source = audioContext.createBufferSource();
+        source.buffer = guitarSamples[stringFolder][fret];
+
+        // Create gain node for basic volume control
+        const gainNode = audioContext.createGain();
+        gainNode.gain.setValueAtTime(0.7, audioContext.currentTime);
+
+        // Connect nodes
+        source.connect(gainNode);
+        gainNode.connect(audioContext.destination);
+
+        // Play the sample
+        source.start();
+        source.stop(audioContext.currentTime + source.buffer.duration);
+
+        console.log(`Playing sample: ${stringFolder} string, fret ${fret}`);
+    } else {
+        console.warn(`No sample found for ${stringFolder} string, fret ${fret}`);
+    }
+}
+
+// Modify the note marker event listeners
+function modifyNoteMarkerEvents() {
+    const noteMarkers = document.querySelectorAll('.full-note-marker');
+
+    noteMarkers.forEach(marker => {
+        marker.addEventListener('click', (event) => {
+            // Extract string and fret from the context
+            const stringEl = event.target.closest('.full-guitar-string');
+            const stringIndex = Array.from(stringEl.parentNode.children).indexOf(stringEl);
+            const strings = ['E', 'B', 'G', 'D', 'A', 'E'];
+            let stringNote = strings[stringIndex];
+
+            // Special handling for E strings
+            if (stringNote === 'E') {
+                stringNote = (stringIndex === 0) ? 'E_HIGH' : 'E';
+            }
+
+            const fret = Array.from(stringEl.children).indexOf(event.target);
+
+            // Get frequency (keep your existing method)
+            const frequency = getNoteFrequency(stringNote, fret);
+
+            // Play note with string and fret information
+            playNote(frequency, stringNote, fret);
+        });
+    });
+}
+
+
+
+function getNoteFrequency(stringNote, fret, octave = null) {
+    // Comprehensive frequency mapping with explicit string distinctions
+    const frequencyMap = {
+        // Low E string (6th string)
+        'E_LOW': {
+            0: 82.41,   // Open string
+            1: 87.31,
+            2: 92.50,
+            3: 98.00,
+            4: 103.83,
+            5: 110.00,
+            6: 116.54,
+            7: 123.47,
+            8: 130.81,
+            9: 138.59,
+            10: 146.83,
+            11: 155.56,
+            12: 164.81,  // 12th fret
+        },
+        // High E string (1st string)
+        'E_HIGH': {
+            0: 329.63,  // Open string
+            1: 349.23,
+            2: 369.99,
+            3: 392.00,
+            4: 415.30,
+            5: 440.00,
+            6: 466.16,
+            7: 493.88,
+            8: 523.25,
+            9: 554.37,
+            10: 587.33,
+            11: 622.25,
+            12: 659.25,  // 12th fret
+        },
+        // B string (2nd string)
+        'B': {
+            0: 123.47,
+            1: 130.81,
+            2: 138.59,
+            3: 146.83,
+            4: 155.56,
+            5: 164.81,
+            6: 174.61,
+            7: 185.00,
+            8: 196.00,
+            9: 207.65,
+            10: 220.00,
+            11: 233.08,
+            12: 246.94,
+        },
+        // G string (3rd string)
+        'G': {
+            0: 98.00,
+            1: 103.83,
+            2: 110.00,
+            3: 116.54,
+            4: 123.47,
+            5: 130.81,
+            6: 138.59,
+            7: 146.83,
+            8: 155.56,
+            9: 164.81,
+            10: 174.61,
+            11: 185.00,
+            12: 196.00,
+        },
+        // D string (4th string)
+        'D': {
+            0: 73.42,
+            1: 77.78,
+            2: 82.41,
+            3: 87.31,
+            4: 92.50,
+            5: 98.00,
+            6: 103.83,
+            7: 110.00,
+            8: 116.54,
+            9: 123.47,
+            10: 130.81,
+            11: 138.59,
+            12: 146.83,
+        },
+        // A string (5th string)
+        'A': {
+            0: 110.00,
+            1: 116.54,
+            2: 123.47,
+            3: 130.81,
+            4: 138.59,
+            5: 146.83,
+            6: 155.56,
+            7: 164.81,
+            8: 174.61,
+            9: 185.00,
+            10: 196.00,
+            11: 207.65,
+            12: 220.00,
+        }
+    };
+
+    // Fallback to equal temperament calculation if exact frequency not found
+    function calculateFrequency(baseFreq, fretNumber) {
+        return baseFreq * Math.pow(2, fretNumber / 12);
+    }
+
+    try {
+        // Determine the correct string note
+        const frequencyNote = stringNote === 'E'
+            ? (fret <= 12 ? 'E_LOW' : 'E_HIGH')
+            : stringNote;
+
+        // Check if exact frequency exists for this fret
+        if (frequencyMap[frequencyNote] && frequencyMap[frequencyNote][fret] !== undefined) {
+            return frequencyMap[frequencyNote][fret];
+        }
+
+        // Fallback to base frequency calculation
+        const baseFrequencies = {
+            'E_LOW': 82.41,
+            'E_HIGH': 329.63,
+            'B': 123.47,
+            'G': 98.00,
+            'D': 73.42,
+            'A': 110.00
+        };
+
+        const baseFreq = baseFrequencies[frequencyNote] || 440;
+        return calculateFrequency(baseFreq, fret);
+
+    } catch (error) {
+        console.error(`Frequency calculation error: ${error.message}`);
+        return 440; // Default to A4
+    }
+}
+
+
+function createFullFretboard() {
+    const fretboardEl = document.getElementById('full-fretboard');
+    const guitarStrings = ['E', 'B', 'G', 'D', 'A', 'E'];
+
+    guitarStrings.forEach((stringNote, stringIndex) => {
+        const stringEl = document.createElement('div');
+        stringEl.className = 'full-guitar-string';
+
+        // Create note markers for each fret (0 to 12)
+        for (let fret = 0; fret <= 12; fret++) {
+            const noteIndex = (ChromaticScale.indexOf(stringNote) + fret) % 12;
+            const note = ChromaticScale[noteIndex];
+
+            const noteMarker = document.createElement('div');
+            noteMarker.className = 'full-note-marker';
+            noteMarker.textContent = note;
+
+            noteMarker.classList.add(
+                isNaturalNote(note) ? 'natural-note' : 'accidental-note'
+            );
+
+            // Use precise percentage positioning
+            noteMarker.style.left = `${FretPositions[fret]}%`;
+
+            // Add click event to play note and update info
+            noteMarker.addEventListener('click', (event) => {
+                    event.preventDefault();
+                    initAudioContext();
+
+                    // Determine string-specific frequency configuration
+                    let frequencyNote;
+                    if (stringNote === 'E') {
+                        // First and last E strings are low E
+                        // Middle E string is high E
+                        frequencyNote = (stringIndex === 5)
+                            ? 'E_LOW'
+                            : 'E_HIGH';
+                    } else {
+                        frequencyNote = stringNote;
+                    }
+
+                    const frequency = getNoteFrequency(frequencyNote, fret);
+                    playNote(frequency);
+
+                    // Update note information
+                    updateNoteInfo(note, stringNote, fret, frequency, frequencyNote);
+                });
+
+            // Similar modification for touchstart event
+                noteMarker.addEventListener('touchstart', (event) => {
+                    event.preventDefault();
+                    initAudioContext();
+
+                    let frequencyNote;
+                    if (stringNote === 'E') {
+                        frequencyNote = (stringIndex === 0 || stringIndex === 5)
+                            ? 'E_LOW'
+                            : 'E_HIGH';
+                    } else {
+                        frequencyNote = stringNote;
+                    }
+
+                    const frequency = getNoteFrequency(frequencyNote, fret);
+                    playNote(frequency);
+
+                    // Update note information
+                    updateNoteInfo(note, stringNote, fret, frequency, frequencyNote);
+                }, { passive: false });
+
+                stringEl.appendChild(noteMarker);
+            }
+
+            fretboardEl.appendChild(stringEl);
+        });
+}
+
+function updateNoteInfo(note, stringNote, fret, frequency, frequencyNote) {
+    // Determine octave (more precise method)
+    const octaves = {
+        'E_LOW': 2,
+        'E_HIGH': 4,
+        'A': 2,
+        'D': 3,
+        'G': 3,
+        'B': 3
+    };
+
+    // Show the note info container
+    const noteInfoContainer = document.getElementById('note-info-container');
+    noteInfoContainer.classList.remove('d-none');
+
+    document.getElementById('selected-note').textContent = note;
+    document.getElementById('selected-string').textContent = stringNote;
+    document.getElementById('selected-fret').textContent = fret;
+    document.getElementById('selected-frequency').textContent = frequency.toFixed(2);
+
+    // Use the frequency note for octave determination
+    const baseOctave = octaves[frequencyNote] || 4;
+    document.getElementById('selected-octave').textContent = baseOctave;
+}
+
+
+// Modify the DOMContentLoaded event listener
+document.addEventListener('DOMContentLoaded', () => {
+    // Initialize audio context early
+    initAudioContext();
+
+    // Load samples first
+    loadGuitarSamples()
+        .then(() => {
+            // Modify note marker events after samples are loaded
+            modifyNoteMarkerEvents();
+        })
+        .catch(error => {
+            console.error('Failed to load guitar samples:', error);
+            // Fallback to frequency-based sound or disable sample playback
+        });
+
+    // Existing audio context initialization
+    document.body.addEventListener('touchstart', initAudioContext, { once: true });
+    document.body.addEventListener('click', initAudioContext, { once: true });
+});
+
+function isNaturalNote(note) {
+    const naturalNotes = ['C', 'D', 'E', 'F', 'G', 'A', 'B'];
+    // Remove any potential prefixes or octave numbers
+    const cleanNote = note.replace(/^(E_LOW|E_HIGH|[A-G])/, '\$1');
+    return naturalNotes.includes(cleanNote);
+}
+
+
+
+
+
+
+
+
+createFullFretboard();
+
+function debugFrequencyMapping() {
+    const strings = ['E_LOW', 'E_HIGH', 'B', 'G', 'D', 'A'];
+
+    console.log("Frequency Mapping Debug:");
+    strings.forEach(stringNote => {
+        console.group(stringNote);
+        for (let fret = 0; fret <= 12; fret++) {
+            const frequency = getNoteFrequency(stringNote, fret);
+            console.log(`Fret ${fret}: ${frequency.toFixed(2)} Hz`);
+        }
+        console.groupEnd();
+    });
+}
+
+// You can call this function in the console or add a debug button
+document.addEventListener('DOMContentLoaded', () => {
+    const debugButton = document.createElement('button');
+    debugButton.textContent = 'Debug Frequencies';
+    debugButton.style.position = 'fixed';
+    debugButton.style.bottom = '10px';
+    debugButton.style.right = '10px';
+    debugButton.addEventListener('click', debugFrequencyMapping);
+    document.body.appendChild(debugButton);
+});
+
+    </script>
+
+<!-- In the Chord Library section -->
+
+
+    <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.2.3/dist/js/bootstrap.bundle.min.js"></script>
+</body>
+</html>

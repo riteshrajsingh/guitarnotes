@@ -1,0 +1,401 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Scale Library</title>
+    <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.2.3/dist/css/bootstrap.min.css" rel="stylesheet">
+    <style>
+        body {
+            background-color: #f4f4f4;
+            font-family: 'Arial', sans-serif;
+        }
+
+        .root-note-btn {
+            margin: 2px;
+        }
+        .chromatic-scale {
+            display: flex;
+            flex-wrap: wrap;
+            gap: 5px;
+            margin-bottom: 20px;
+        }
+        #scale-notes .badge {
+            margin-right: 5px;
+        }
+        .dropdown-menu {
+            max-height: 300px;
+            overflow-y: auto;
+        }
+    </style>
+</head>
+<!-- Google tag (gtag.js) -->
+<script async src="https://www.googletagmanager.com/gtag/js?id=G-KR7X84HFYE"></script>
+<script>
+  window.dataLayer = window.dataLayer || [];
+  function gtag(){dataLayer.push(arguments);}
+  gtag('js', new Date());
+
+  gtag('config', 'G-KR7X84HFYE');
+</script>
+<body>
+    <div class="container py-5">
+        <div class="text-center mb-5">
+            <h1 class="display-4 fw-bold text-dark">Scale Library</h1>
+            <p class="lead text-muted">Explore Musical Scales and Modes</p>
+            <a href="{{ url_for('index') }}" class="btn btn-outline-success mt-3">
+                <i class="bi bi-arrow-left"></i> Back to Home
+            </a>
+        </div>
+        <div class="row justify-content-center">
+            <div class="col-md-12">
+                <div class="card border-0 shadow-sm">
+                    <div class="card-body">
+                        <!-- Chromatic Scale Selection -->
+                        <div class="mb-4">
+                            <h5 class="text-muted mb-3">Select Root Note:</h5>
+                            <div class="chromatic-scale" id="chromatic-scale">
+                                <!-- Notes will be dynamically added here -->
+                            </div>
+                        </div>
+
+                        <!-- Scale Type Selection -->
+                        <div class="mb-4" id="scale-type-container" style="display: none;">
+                            <h5 class="text-muted mb-3">Select Scale Type:</h5>
+                            <div class="d-flex flex-wrap gap-2">
+                                <button class="btn btn-outline-success scale-btn" data-scale-type="Major">Major (Ionian)</button>
+
+                                <div class="btn-group" role="group">
+                                    <button type="button" class="btn btn-outline-success dropdown-toggle" data-bs-toggle="dropdown">Minor</button>
+                                    <div class="dropdown-menu">
+                                        <a class="dropdown-item scale-btn" href="#" data-scale-type="NaturalMinor">Natural Minor (Aeolian)</a>
+                                        <a class="dropdown-item scale-btn" href="#" data-scale-type="HarmonicMinor">Harmonic Minor</a>
+                                        <a class="dropdown-item scale-btn" href="#" data-scale-type="MelodicMinor">Melodic Minor</a>
+                                    </div>
+                                </div>
+
+                                <div class="btn-group" role="group">
+                                    <button type="button" class="btn btn-outline-success dropdown-toggle" data-bs-toggle="dropdown">Modes</button>
+                                    <div class="dropdown-menu">
+                                        <a class="dropdown-item scale-btn" href="#" data-scale-type="Dorian">Dorian</a>
+                                        <a class="dropdown-item scale-btn" href="#" data-scale-type="Phrygian">Phrygian</a>
+                                        <a class="dropdown-item scale-btn" href="#" data-scale-type="Lydian">Lydian</a>
+                                        <a class="dropdown-item scale-btn" href="#" data-scale-type="Mixolydian">Mixolydian</a>
+                                        <a class="dropdown-item scale-btn" href="#" data-scale-type="Locrian">Locrian</a>
+                                    </div>
+                                </div>
+
+                                <div class="btn-group" role="group">
+                                    <button type="button" class="btn btn-outline-success dropdown-toggle" data-bs-toggle="dropdown">Special Scales</button>
+                                    <div class="dropdown-menu">
+                                        <a class="dropdown-item scale-btn" href="#" data-scale-type="WholeTone">Whole Tone</a>
+                                        <a class="dropdown-item scale-btn" href="#" data-scale-type="Pentatonic">Pentatonic</a>
+                                        <a class="dropdown-item scale-btn" href="#" data-scale-type="Blues">Blues</a>
+                                        <a class="dropdown-item scale-btn" href="#" data-scale-type="Chromatic">Chromatic</a>
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+
+                        <!-- Scale Details -->
+                        <div id="scale-details" class="mt-4" style="display: none;">
+                            <div class="card">
+                                <div class="card-body">
+                                    <h4 id="selected-scale-name" class="card-title text-success"></h4>
+                                    <div id="scale-formula" class="mb-3"></div>
+                                    <div id="scale-notes" class="d-flex flex-wrap gap-2"></div>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.2.3/dist/js/bootstrap.bundle.min.js"></script>
+    <script>
+        // Comprehensive Scale Theory (same as previous version)
+        const ScaleTheory = {
+        // Major Scales
+        Major: {
+            formula: 'W-W-H-W-W-W-H',
+            intervals: [0, 2, 4, 5, 7, 9, 11],
+            description: 'Ionian mode, the standard major scale'
+        },
+
+        // Minor Scales
+        NaturalMinor: {
+            formula: 'W-H-W-W-H-W-W',
+            intervals: [0, 2, 3, 5, 7, 8, 10],
+            description: 'Aeolian mode, the natural minor scale'
+        },
+        HarmonicMinor: {
+            formula: 'W-H-W-W-H-W+H-H',
+            intervals: [0, 2, 3, 5, 7, 8, 11],
+            description: 'Minor scale with raised 7th degree'
+        },
+        MelodicMinor: {
+            formula: 'W-H-W-W-W-W-H (ascending)',
+            intervals: [0, 2, 3, 5, 7, 9, 11],
+            description: 'Minor scale with raised 6th and 7th degrees when ascending'
+        },
+
+        // Modal Scales
+        Dorian: {
+            formula: 'W-H-W-W-W-H-W',
+            intervals: [0, 2, 3, 5, 7, 9, 10],
+            description: 'Minor mode with a raised 6th, common in jazz and folk music'
+        },
+        Phrygian: {
+            formula: 'H-W-W-W-H-W-W',
+            intervals: [0, 1, 3, 5, 7, 8, 10],
+            description: 'Dark, exotic scale with a distinctive flat 2nd'
+        },
+        Lydian: {
+            formula: 'W-W-W-H-W-W-H',
+            intervals: [0, 2, 4, 6, 7, 9, 11],
+            description: 'Bright scale with a raised 4th, often used in film scores'
+        },
+        Mixolydian: {
+            formula: 'W-W-H-W-W-H-W',
+            intervals: [0, 2, 4, 5, 7, 9, 10],
+            description: 'Major scale with a lowered 7th, common in blues and rock'
+        },
+        Locrian: {
+            formula: 'H-W-W-H-W-W-W',
+            intervals: [0, 1, 3, 5, 6, 8, 10],
+            description: 'Most dissonant mode, rarely used in traditional music'
+        },
+
+        // Additional Scales
+        WholeTone: {
+            formula: 'W-W-W-W-W-W',
+            intervals: [0, 2, 4, 6, 8, 10],
+            description: 'Symmetrical scale with equal whole steps, creates a dreamy sound'
+        },
+        Pentatonic: {
+            formula: 'W-W-W+H-W-W+H',
+            intervals: [0, 2, 4, 7, 9],
+            description: 'Five-note scale, fundamental to many musical traditions'
+        },
+        Blues: {
+            formula: 'W+H-H-H-W+H-W',
+            intervals: [0, 3, 5, 6, 7, 10],
+            description: 'Characteristic scale of blues music with blue notes'
+        },
+        Chromatic: {
+            formula: 'H-H-H-H-H-H-H-H-H-H-H',
+            intervals: [0, 1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11],
+            description: 'Scale containing all 12 semitones in an octave'
+        }
+    };
+
+        const ChromaticScale = ['C', 'C#', 'D', 'D#', 'E', 'F', 'F#', 'G', 'G#', 'A', 'A#', 'B'];
+        let selectedRoot = null;
+        let selectedScaleType = null;
+
+        // Ensure the DOM is fully loaded
+        document.addEventListener('DOMContentLoaded', () => {
+            // Create chromatic scale buttons
+            const chromaticScaleContainer = document.getElementById('chromatic-scale');
+            ChromaticScale.forEach(note => {
+                const btn = document.createElement('button');
+                btn.className = 'btn btn-outline-primary root-note-btn';
+                btn.dataset.note = note;
+                btn.textContent = note;
+                btn.addEventListener('click', rootNoteClickHandler);
+                chromaticScaleContainer.appendChild(btn);
+            });
+
+            // Add event listeners to scale type buttons
+            document.querySelectorAll('.scale-btn').forEach(btn => {
+                btn.addEventListener('click', scaleTypeClickHandler);
+            });
+        });
+
+        function rootNoteClickHandler(event) {
+            // Remove previous selection
+            document.querySelectorAll('.root-note-btn').forEach(b => {
+                b.classList.remove('btn-primary');
+                b.classList.add('btn-outline-primary');
+            });
+
+            // Add active state
+            event.target.classList.remove('btn-outline-primary');
+            event.target.classList.add('btn-primary');
+
+            // Show scale type container
+            document.getElementById('scale-type-container').style.display = 'block';
+
+            // Store selected root
+            selectedRoot = event.target.dataset.note;
+
+            // Reset scale details
+            document.getElementById('scale-details').style.display = 'none';
+            document.getElementById('selected-scale-name').innerHTML = '';
+            document.getElementById('scale-formula').innerHTML = '';
+            document.getElementById('scale-notes').innerHTML = '';
+
+            // Remove previous scale type selections
+            document.querySelectorAll('.scale-btn').forEach(b => {
+                b.classList.remove('btn-success');
+                b.classList.add('btn-outline-success');
+            });
+
+            // Reset selected scale type
+            selectedScaleType = null;
+        }
+
+        function scaleTypeClickHandler(event) {
+            event.preventDefault(); // Prevent default for dropdown items
+
+            // Remove previous selection
+            document.querySelectorAll('.scale-btn').forEach(b => {
+                b.classList.remove('btn-success');
+                b.classList.add('btn-outline-success');
+            });
+
+            // Add active state
+            event.target.classList.remove('btn-outline-success');
+            event.target.classList.add('btn-success');
+
+            // Store selected scale type
+            selectedScaleType = event.target.dataset.scaleType;
+
+            // Calculate and display scale
+            calculateScale();
+        }
+
+        function calculateScale() {
+            // Validate inputs
+            if (!selectedRoot) {
+                alert('Please select a root note first');
+                return;
+            }
+
+            if (!selectedScaleType) {
+                alert('Please select a scale type');
+                return;
+            }
+
+            // Get scale details
+            const scaleDetails = ScaleTheory[selectedScaleType];
+
+            // Calculate scale notes
+            const scaleNotes = scaleDetails.intervals.map(interval => {
+                const noteIndex = (ChromaticScale.indexOf(selectedRoot) + interval) % 12;
+                return ChromaticScale[noteIndex];
+            });
+
+            // Display scale details
+            const scaleDetailsContainer = document.getElementById('scale-details');
+            scaleDetailsContainer.style.display = 'block';
+
+            // Set scale name
+            document.getElementById('selected-scale-name').innerHTML =
+                `${selectedRoot} ${selectedScaleType} Scale`;
+
+            // Display scale formula and description
+            document.getElementById('scale-formula').innerHTML =
+                `<strong>Formula:</strong> ${scaleDetails.formula}<br>
+                <strong>Description:</strong> ${scaleDetails.description}`;
+
+            // Display scale notes
+            const scaleNotesContainer = document.getElementById('scale-notes');
+            scaleNotesContainer.innerHTML = '';
+
+            // Highlight scale notes in chromatic scale
+            const chromaticScaleContainer = document.getElementById('chromatic-scale');
+            chromaticScaleContainer.querySelectorAll('.root-note-btn').forEach(noteBtn => {
+                const note = noteBtn.dataset.note;
+                if (scaleNotes.includes(note)) {
+                    noteBtn.classList.add('btn-success');
+                    noteBtn.classList.remove('btn-outline-primary', 'btn-primary');
+                } else {
+                    noteBtn.classList.remove('btn-success');
+                    noteBtn.classList.add('btn-outline-primary');
+                }
+            });
+
+            // Create scale notes display
+            scaleNotes.forEach(note => {
+                const noteEl = document.createElement('span');
+                noteEl.classList.add('badge', 'bg-success', 'fs-6');
+                noteEl.textContent = note;
+                scaleNotesContainer.appendChild(noteEl);
+            });
+        }
+
+       function createChromaticScale(rootNote) {
+    const chromaticScaleContainer = document.getElementById('chromatic-scale');
+    chromaticScaleContainer.innerHTML = ''; // Clear existing buttons
+
+    // Reorder ChromaticScale to start from the selected root
+    const rootIndex = ChromaticScale.indexOf(rootNote);
+    const reorderedScale = [
+        ...ChromaticScale.slice(rootIndex),
+        ...ChromaticScale.slice(0, rootIndex)
+    ];
+
+    // Create chromatic scale buttons with the new order
+    reorderedScale.forEach(note => {
+        const btn = document.createElement('button');
+        btn.className = 'btn btn-outline-primary root-note-btn';
+        btn.dataset.note = note;
+        btn.textContent = note;
+        btn.addEventListener('click', rootNoteClickHandler);
+        chromaticScaleContainer.appendChild(btn);
+    });
+}
+
+function rootNoteClickHandler(event) {
+    // Remove previous selection
+    document.querySelectorAll('.root-note-btn').forEach(b => {
+        b.classList.remove('btn-primary');
+        b.classList.add('btn-outline-primary');
+    });
+
+    // Add active state
+    event.target.classList.remove('btn-outline-primary');
+    event.target.classList.add('btn-primary');
+
+    // Show scale type container
+    document.getElementById('scale-type-container').style.display = 'block';
+
+    // Store selected root
+    selectedRoot = event.target.dataset.note;
+
+    // Reorder chromatic scale based on selected root
+    createChromaticScale(selectedRoot);
+
+    // Reset scale details
+    document.getElementById('scale-details').style.display = 'none';
+    document.getElementById('selected-scale-name').innerHTML = '';
+    document.getElementById('scale-formula').innerHTML = '';
+    document.getElementById('scale-notes').innerHTML = '';
+
+    // Remove previous scale type selections
+    document.querySelectorAll('.scale-btn').forEach(b => {
+        b.classList.remove('btn-success');
+        b.classList.add('btn-outline-success');
+    });
+
+    // Reset selected scale type
+    selectedScaleType = null;
+}
+
+// Modify the initial DOM loaded event listener
+document.addEventListener('DOMContentLoaded', () => {
+    // Initially create chromatic scale starting from C
+    createChromaticScale('C');
+
+    // Add event listeners to scale type buttons
+    document.querySelectorAll('.scale-btn').forEach(btn => {
+        btn.addEventListener('click', scaleTypeClickHandler);
+    });
+});
+
+    </script>
+</body>
+</html>
