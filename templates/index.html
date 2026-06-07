@@ -1,303 +1,351 @@
 <!DOCTYPE html>
 <html lang="en">
 <head>
-    <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Ritesh Raj Singh | Engineering Enthusiast & Learner</title>
-    <style>
-        :root {
-            --primary: #0071e3;
-            --dark: #1d1d1f;
-            --grey: #86868b;
-            --light-bg: #f5f5f7;
-            --border: #d2d2d7;
-        }
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Ritesh Raj Singh | Engineering Leader</title>
+<style>
+:root{
+--bg:#f5f7fb;
+--card:rgba(255,255,255,.82);
+--text:#111827;
+--muted:#6b7280;
+--accent:#2563eb;
+--border:rgba(0,0,0,.06);
+--shadow:0 20px 60px rgba(0,0,0,.08);
+}
 
-        * {
-            box-sizing: border-box;
-            margin: 0;
-            padding: 0;
-            scroll-behavior: smooth;
-        }
+@media (prefers-color-scheme:dark){
+:root{
+--bg:#0b1220;
+--card:rgba(17,24,39,.85);
+--text:#f8fafc;
+--muted:#94a3b8;
+--accent:#60a5fa;
+--border:rgba(255,255,255,.08);
+}
+}
 
-        body {
-            font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
-            background-color: var(--light-bg);
-            color: var(--dark);
-            line-height: 1.6;
-        }
+*{margin:0;padding:0;box-sizing:border-box}
+html{scroll-behavior:smooth}
 
-        /* Top Navigation Bar */
-        nav {
-            position: fixed;
-            top: 0;
-            width: 100%;
-            background: rgba(255, 255, 255, 0.8);
-            backdrop-filter: blur(20px);
-            -webkit-backdrop-filter: blur(20px);
-            border-bottom: 1px solid var(--border);
-            z-index: 1000;
-        }
+body{
+font-family:Inter,-apple-system,BlinkMacSystemFont,"Segoe UI",sans-serif;
+background:var(--bg);
+color:var(--text);
+line-height:1.7;
+}
 
-        .nav-container {
-            max-width: 900px;
-            margin: 0 auto;
-            display: flex;
-            justify-content: space-between;
-            align-items: center;
-            padding: 0.8rem 1.5rem;
-        }
+body::before{
+content:"";
+position:fixed;
+inset:0;
+background:
+radial-gradient(circle at top left,rgba(37,99,235,.12),transparent 40%),
+radial-gradient(circle at bottom right,rgba(37,99,235,.08),transparent 45%);
+z-index:-1;
+}
 
-        .nav-logo {
-            font-weight: 700;
-            font-size: 1.1rem;
-            letter-spacing: -0.02em;
-        }
+nav{
+position:fixed;
+top:0;
+width:100%;
+z-index:1000;
+backdrop-filter:blur(20px);
+background:rgba(255,255,255,.7);
+border-bottom:1px solid var(--border);
+}
 
-        .nav-links {
-            display: flex;
-            gap: 20px;
-            list-style: none;
-        }
+@media (prefers-color-scheme:dark){
+nav{background:rgba(11,18,32,.75);}
+}
 
-        .nav-links a {
-            text-decoration: none;
-            color: var(--dark);
-            font-size: 0.9rem;
-            font-weight: 500;
-            transition: color 0.2s;
-        }
+.nav{
+max-width:1200px;
+margin:auto;
+padding:1rem 2rem;
+display:flex;
+justify-content:space-between;
+align-items:center;
+flex-wrap:wrap;
+gap:1rem;
+}
 
-        .nav-links a:hover {
-            color: var(--primary);
-        }
+.nav ul{
+display:flex;
+gap:1.5rem;
+list-style:none;
+flex-wrap:wrap;
+}
 
-        /* Main Container */
-        .container {
-            max-width: 800px;
-            margin: 0 auto;
-            padding: 6rem 1.5rem 3rem 1.5rem;
-        }
+.nav a{
+text-decoration:none;
+color:var(--muted);
+font-weight:600;
+}
 
-        /* Hero / Profile Card Section */
-        .hero-section {
-            background: white;
-            border-radius: 20px;
-            border: 1px solid var(--border);
-            padding: 3rem 2rem;
-            margin-bottom: 2rem;
-            display: flex;
-            align-items: center;
-            gap: 2.5rem;
-            box-shadow: 0 4px 12px rgba(0, 0, 0, 0.01);
-        }
+.container{
+max-width:1200px;
+margin:auto;
+padding:7rem 2rem 4rem;
+}
 
-        .profile-img-container {
-            flex-shrink: 0;
-            width: 160px;
-            height: 160px;
-        }
+.hero{
+min-height:75vh;
+display:grid;
+grid-template-columns:280px 1fr;
+gap:4rem;
+align-items:center;
+}
 
-        .profile-img {
-            width: 100%;
-            height: 100%;
-            border-radius: 50%;
-            object-fit: cover;
-            border: 4px solid white;
-            box-shadow: 0 4px 14px rgba(0,0,0,0.08);
-            background-color: #e8e8ed;
-        }
+.avatar img{
+width:280px;
+height:280px;
+object-fit:cover;
+border-radius:40px;
+box-shadow:var(--shadow);
+}
 
-        .hero-content h1 {
-            font-size: 2.4rem;
-            font-weight: 700;
-            letter-spacing: -0.03em;
-            margin-bottom: 0.25rem;
-        }
+.hero h1{
+font-size:clamp(3rem,7vw,5rem);
+line-height:1;
+margin-bottom:1rem;
+}
 
-        .hero-tagline {
-            font-size: 1.2rem;
-            color: var(--primary);
-            font-weight: 500;
-            margin-bottom: 1rem;
-        }
+.subtitle{
+font-size:1.3rem;
+font-weight:700;
+color:var(--accent);
+margin-bottom:1rem;
+}
 
-        .hero-bio {
-            color: #424245;
-            font-size: 1.05rem;
-        }
+.hero p{
+font-size:1.1rem;
+color:var(--muted);
+max-width:760px;
+}
 
-        @media (max-width: 650px) {
-            .hero-section { flex-direction: column; text-align: center; padding: 2rem 1.5rem; }
-        }
+.tags{
+display:flex;
+flex-wrap:wrap;
+gap:.75rem;
+margin-top:1.5rem;
+}
 
-        /* Core Focus Areas */
-        .section-title {
-            font-size: 1.4rem;
-            font-weight: 600;
-            margin: 2.5rem 0 1.25rem 0;
-            letter-spacing: -0.01em;
-            color: var(--dark);
-        }
+.tags span{
+padding:.75rem 1rem;
+border-radius:999px;
+background:rgba(255,255,255,.95);
+color:#111827;
+font-weight:600;
+border:1px solid rgba(0,0,0,.06);
+}
 
-        .panel {
-            background: white;
-            border-radius: 20px;
-            border: 1px solid var(--border);
-            padding: 2.5rem;
-            margin-bottom: 1.5rem;
-        }
+@media (prefers-color-scheme:dark){
+.tags span{
+background:rgba(30,41,59,.85);
+color:#f8fafc;
+border:1px solid rgba(255,255,255,.08);
+}
+}
 
-        .panel-header {
-            display: flex;
-            justify-content: space-between;
-            align-items: center;
-            margin-bottom: 1rem;
-            flex-wrap: wrap;
-            gap: 10px;
-        }
+section{margin-top:5rem}
 
-        .panel-header h2 {
-            font-size: 1.3rem;
-            font-weight: 600;
-            letter-spacing: -0.02em;
-        }
+.section-title{
+font-size:2rem;
+font-weight:800;
+margin-bottom:2rem;
+}
 
-        /* Link Buttons & Badges */
-        .btn-link {
-            display: inline-flex;
-            align-items: center;
-            background-color: var(--primary);
-            color: white;
-            padding: 6px 16px;
-            border-radius: 16px;
-            text-decoration: none;
-            font-size: 0.85rem;
-            font-weight: 500;
-            transition: background 0.2s;
-        }
+.grid,.family{
+display:grid;
+grid-template-columns:repeat(auto-fit,minmax(320px,1fr));
+gap:1.5rem;
+}
 
-        .btn-link:hover { background-color: #0077ed; }
+.card{
+background:var(--card);
+backdrop-filter:blur(20px);
+border:1px solid var(--border);
+border-radius:28px;
+padding:2rem;
+box-shadow:var(--shadow);
+transition:.25s;
+}
 
-        .badge-status {
-            font-size: 0.8rem;
-            font-weight: 500;
-            background: rgba(134, 134, 139, 0.1);
-            color: var(--grey);
-            padding: 4px 12px;
-            border-radius: 12px;
-            letter-spacing: 0.02em;
-        }
+.card:hover{
+transform:translateY(-5px);
+}
 
-        .panel-desc {
-            color: #424245;
-            font-size: 1rem;
-            margin-bottom: 1rem;
-        }
+.card h3{
+margin-bottom:1rem;
+}
 
-        .details-list {
-            padding-left: 1.25rem;
-            color: #515154;
-            font-size: 0.95rem;
-        }
+.card p{
+color:var(--muted);
+}
 
-        .details-list li {
-            margin-bottom: 0.5rem;
-        }
+.badge{
+display:inline-block;
+padding:.45rem .9rem;
+border-radius:999px;
+background:#e0e7ff;
+color:#3730a3;
+font-size:.75rem;
+font-weight:700;
+margin-bottom:1rem;
+}
 
-        footer {
-            text-align: center;
-            font-size: 0.85rem;
-            color: var(--grey);
-            margin: 4rem 0 2rem 0;
-        }
-    </style>
+.btn{
+display:inline-block;
+margin-top:1.25rem;
+padding:.85rem 1.2rem;
+border-radius:999px;
+background:var(--accent);
+color:white;
+text-decoration:none;
+font-weight:700;
+}
+
+footer{
+margin-top:5rem;
+padding-top:2rem;
+border-top:1px solid var(--border);
+text-align:center;
+color:var(--muted);
+}
+
+@media(max-width:768px){
+.hero{
+grid-template-columns:1fr;
+text-align:center;
+}
+.avatar{
+display:flex;
+justify-content:center;
+}
+.tags{
+justify-content:center;
+}
+}
+</style>
 </head>
 <body>
 
-    <!-- Simple Navigation -->
-    <nav>
-        <div class="nav-container">
-            <div class="nav-logo">Ritesh Raj Singh</div>
-            <ul class="nav-links">
-                <li><a href="#agents">AI Agents</a></li>
-                <li><a href="#guitar">GuitarNotes</a></li>
-                <li><a href="#aviation">Aviation</a></li>
-            </ul>
-        </div>
-    </nav>
+<nav>
+<div class="nav">
+<strong>Ritesh Raj Singh</strong>
+<ul>
+<li><a href="#projects">Projects</a></li>
+<li><a href="#family">Family</a></li>
+</ul>
+</div>
+</nav>
 
-    <div class="container">
-        
-        <!-- About Section -->
-        <section class="hero-section">
-            <div class="profile-img-container">
-                <img src="ritesh.jpeg" alt="Ritesh Raj Singh" class="profile-img" onerror="this.src='https://cdn-icons-png.flaticon.com/512/3135/3135715.png'">
-            </div>
-            <div class="hero-content">
-                <h1>Ritesh Raj Singh</h1>
-                <div class="hero-tagline">Engineering Enthusiast</div>
-                <p class="hero-bio">
-                    Driven by a deep passion for software systems and complex problem-solving with over 20 years of hands-on experience. A lifelong learner holding two master's degrees focused on software engineering and machine learning architectures, constantly exploring the intersection of deep theory and practical execution.
-                </p>
-            </div>
-        </section>
+<div class="container">
 
-        <h3 class="section-title">Core Focus Areas</h3>
+<section class="hero">
+<div class="avatar">
+<img src="/static/ritesh.jpeg" alt="Ritesh Raj Singh">
+</div>
 
-        <!-- Area 1: AI Agents -->
-        <div id="agents" class="panel">
-            <div class="panel-header">
-                <h2>🤖 AI Agents for Self Management</h2>
-                <span class="badge-status">Coming Soon</span>
-            </div>
-            <p class="panel-desc">
-                Building customized, local intelligence frameworks aimed at automating daily operations, tracking cognitive productivity metrics, and streamlining personal knowledge graphs.
-            </p>
-            <ul class="details-list">
-                <li>Designing agentic workflows that orchestrate cross-functional tasks autonomously.</li>
-                <li>Leveraging lightweight, open-source large language models optimized for localized execution.</li>
-                <li>Developing contextual memory frameworks to handle deep personal task prioritization.</li>
-            </ul>
-        </div>
+<div>
+<h1>Ritesh Raj Singh</h1>
+<div class="subtitle">Engineering Leader • Software Architect • Lifelong Learner</div>
 
-        <!-- Area 2: Guitar Notes -->
-        <div id="guitar" class="panel" style="background: linear-gradient(135deg, rgba(0,113,227,0.01) 0%, rgba(0,113,227,0) 100%); border-color: rgba(0,113,227,0.15);">
-            <div class="panel-header">
-                <h2>🎸 GuitarNotes</h2>
-                <a href="/guitar" class="btn-link">Launch App</a>
-            </div>
-            <p class="panel-desc">
-                An interactive music theory utility developed to map concepts directly to the fretboard, bridging the gap between musical math and creative composition.
-            </p>
-            <ul class="details-list">
-                <li>Dynamic transposer engines designed to handle custom capo shifts instantly.</li>
-                <li>Interactive scale charts and metric matrices focusing on acoustic chord configurations.</li>
-                <li>Integrated audio sample feedback architectures to assist with auditory ear training.</li>
-            </ul>
-        </div>
+<p>
+I am an engineering leader, software architect, and lifelong learner with more than two decades of experience building products, platforms, and high-performing teams. My interests span distributed systems, artificial intelligence, machine learning, aviation, and music. This site serves as a place to share projects, lessons learned, personal pursuits, and the continuous journey of learning something new every day.
+</p>
 
-        <!-- Area 3: Private Pilot -->
-        <div id="aviation" class="panel">
-            <div class="panel-header">
-                <h2>🛩️ Private Pilot Flight Deck</h2>
-                <span class="badge-status">Coming Soon</span>
-            </div>
-            <p class="panel-desc">
-                Applying rigorous engineering systems logic directly to cockpit navigation, aerodynamics tracking, and cross-country flight planning execution.
-            </p>
-            <ul class="details-list">
-                <li>Documenting real-time aviation logs, instrument training milestones, and hours.</li>
-                <li>Tracking wind vector drift calculations and airmanship data structures.</li>
-                <li>Exploring how programmatic simulation can optimize pattern management and ground school theory.</li>
-            </ul>
-        </div>
+<div class="tags">
+<span>Engineering Leadership</span>
+<span>AI Systems</span>
+<span>Machine Learning</span>
+<span>Distributed Systems</span>
+<span>Aviation</span>
+</div>
+</div>
+</section>
 
-    </div>
+<section id="projects">
+<h2 class="section-title">Current Projects & Interests</h2>
 
-    <footer>
-        &copy; 2026 Ritesh Raj Singh. All rights reserved.
-    </footer>
+<div class="grid">
+
+<div class="card">
+<div class="badge">Coming Soon</div>
+<h3>AI Agents for Self Management</h3>
+<p>
+Building practical AI systems that help automate personal workflows, knowledge management, decision support, and productivity tracking. The goal is to combine local AI models, automation, and structured personal knowledge into a highly effective daily operating system.
+</p>
+</div>
+
+<div class="card">
+<h3>GuitarNotes Utility Framework</h3>
+<p>
+An interactive music theory utility designed to bridge the gap between musical concepts and the fretboard. The project focuses on scales, chord relationships, transposition, ear training, and practical tools that make learning guitar more intuitive.
+</p>
+<a class="btn" href="/guitar">Launch Application</a>
+</div>
+
+<div class="card">
+<div class="badge">Active Learning Journey</div>
+<h3>Private Pilot Flight Training</h3>
+<p>
+Learning to fly has become one of the most rewarding challenges of my life. As a student pilot, I am documenting every stage of the journey—from aircraft systems and navigation to weather analysis, communications, flight planning, and aeronautical decision making.
+</p>
+<br>
+<p>
+This section serves as a personal aviation journal where I share lessons learned, training milestones, flying experiences, memorable flights, aviation events, safety insights, interesting incidents, and reflections from instructors and fellow pilots. The objective is to capture the continuous learning process while developing the skills and judgment required to become a safe and proficient aviator.
+</p>
+</div>
+
+</div>
+</section>
+
+<section id="family">
+<h2 class="section-title">Personal Journeys</h2>
+
+<div class="family">
+
+<div class="card">
+<h3>Riaan</h3>
+
+<p>
+Riaan is entering 8th grade and has developed a strong passion for digital creativity. He enjoys animation, artwork, storytelling, video production, and building his own imaginative worlds through technology.
+</p>
+
+<br>
+
+<p>
+What started as simple sketches and experiments has evolved into creating original animated content, learning creative tools, exploring visual storytelling, and sharing his work online. Watching him combine artistic expression with technical curiosity has been one of the most rewarding parts of parenthood.
+</p>
+
+<a class="btn" target="_blank" href="https://www.youtube.com/@RiaanAnimations">YouTube Channel</a>
+</div>
+
+<div class="card">
+<h3>Miraya</h3>
+
+<p>
+Miraya is preparing for one of the biggest milestones of her school years: the transition into middle school and 6th grade. She approaches new experiences with enthusiasm, curiosity, and determination.
+</p>
+
+<br>
+
+<p>
+Whether it is academics, friendships, creative activities, or discovering new interests, she continues to grow in confidence and independence every year. It is exciting to watch her develop her own personality, strengths, and aspirations while embracing the opportunities and challenges that come with this next chapter.
+</p>
+</div>
+
+</div>
+</section>
+
+<footer>
+© 2026 Ritesh Raj Singh. All rights reserved.
+</footer>
+
+</div>
 
 </body>
 </html>
