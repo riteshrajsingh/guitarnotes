@@ -86,7 +86,11 @@ def get_capo_patterns_old(input_chord_progression):
     return results
 
 @app.route('/')
-def index():
+def home():
+    return render_template('index.html')
+
+@app.route('/guitar')
+def guitar_landing():
     return render_template('main.html')
 
 @app.route('/scales')
@@ -95,14 +99,12 @@ def scales():
 
 @app.route('/guitar-samples/<string:string_folder>/<path:filename>')
 def serve_guitar_sample(string_folder, filename):
-    print(string_folder)
-    samples_dir = os.path.join(os.path.dirname(__file__), 'guitar-samples')
-
+    base_dir = os.path.dirname(os.path.abspath(__file__))
+    samples_dir = os.path.join(base_dir, 'guitar-samples')
+    relative_file_path = os.path.join(string_folder, filename)
+    
     try:
-        return send_from_directory(
-            os.path.join(samples_dir, string_folder),
-            filename
-        )
+        return send_from_directory(samples_dir, relative_file_path)
     except FileNotFoundError:
         return "Sample not found", 404
 
