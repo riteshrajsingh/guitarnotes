@@ -144,6 +144,37 @@
         .chord-type-btn {
             margin: 5px;
         }
+
+        /* Chord Pattern Diagram Styles */
+        .pattern-tab-btn {
+            font-size: 0.9rem;
+        }
+        .finger-legend {
+            display: flex;
+            flex-wrap: wrap;
+            gap: 14px;
+            align-items: center;
+        }
+        .finger-legend-item {
+            display: inline-flex;
+            align-items: center;
+            gap: 6px;
+            font-size: 0.9rem;
+            color: #333;
+        }
+        .finger-dot {
+            display: inline-block;
+            width: 16px;
+            height: 16px;
+            border-radius: 50%;
+            border: 1.5px solid #222;
+        }
+        .pattern-diagram-wrapper {
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            min-height: 320px;
+        }
         /* Rest of your original CSS remains the same */
     </style>
 </head>
@@ -262,6 +293,36 @@
                         <div id="fretboard-section" class="mt-4" style="display:none;">
                         <h5 class="text-muted mb-3">Fretboard Voicings:</h5>
                             <div id="fretboard-voicings" class="fretboard-container"></div>
+                        </div>
+
+                        <!-- Chord Playing Patterns -->
+                        <div id="chord-patterns-section" class="mt-4" style="display:none;">
+                            <h5 class="text-muted mb-3">Chord Playing Patterns:</h5>
+                            <div class="card border-0 bg-light">
+                                <div class="card-body">
+                                    <div class="row align-items-center mb-3">
+                                        <div class="col-md-6">
+                                            <div class="pattern-diagram-wrapper">
+                                                <div id="pattern-diagram"></div>
+                                            </div>
+                                        </div>
+                                        <div class="col-md-6">
+                                            <h6 class="text-muted mb-2">Finger Color Code</h6>
+                                            <div id="finger-legend" class="finger-legend mb-3"></div>
+                                            <p class="text-muted small mb-1">
+                                                <strong>×</strong> above a string &mdash; don't play that string.
+                                            </p>
+                                            <p class="text-muted small mb-1">
+                                                <strong>○</strong> above a string &mdash; play it open.
+                                            </p>
+                                            <p class="text-muted small mb-0">
+                                                Each circle shows the note played at that fret. The bar across the diagram is a barre (one finger pressing multiple strings).
+                                            </p>
+                                        </div>
+                                    </div>
+                                    <div id="pattern-tabs"></div>
+                                </div>
+                            </div>
                         </div>
                     </div>
                 </div>
@@ -463,6 +524,7 @@ document.querySelectorAll('.root-note-btn').forEach(btn => {
     btn.addEventListener('click', function() {
         document.getElementById('chord-family-section').style.display = 'none';
         document.getElementById('fretboard-section').style.display = 'none';
+        document.getElementById('chord-patterns-section').style.display = 'none';
 
         // Remove active state from all root note buttons
         document.querySelectorAll('.root-note-btn').forEach(b => {
@@ -613,6 +675,7 @@ function displayChordDetails(rootNote, chordType) {
 
     chordDetailsContainer.style.display = 'block';
     generateFretboardVoicing(rootNote, normalizedChordType);
+    displayChordPatterns(rootNote, normalizedChordType);
 }
 
 
@@ -686,17 +749,450 @@ function generateFretboardVoicing(rootNote, chordType) {
     fretboardSection.style.display = 'block';
 }
 
-// Replace the previous chord type selection event listeners with:
-const chordTypeSelect = document.getElementById('chord-type-select');
+// ===== Chord Playing Patterns =====
+// Standard tuning, indexed 0..5 = low E (thickest) .. high E (thinnest).
+const StringTuning = ['E', 'A', 'D', 'G', 'B', 'E'];
+const StringPC = StringTuning.map(n => ChromaticScale.indexOf(n));
 
-chordTypeSelect.addEventListener('change', function() {
-    const selectedChordType = this.value;
+const FingerColors = {
+    1: '#2563eb',  // index — blue
+    2: '#16a34a',  // middle — green
+    3: '#ea580c',  // ring — orange
+    4: '#dc2626',  // pinky — red
+};
 
-    if (selectedChordType) {
-        // Calculate and display chord
-        displayChordDetails(selectedRoot, selectedChordType);
+// Voicings: every fingering whose fretted notes fit inside this many frets
+// (the practical hand reach). Span = max(fret) - min(fret), so 3 = 4 frets
+// inclusive (e.g. frets 3-6).
+// Muting rule: only the low E and A strings may be muted, and A may be
+// muted only if low E is also muted (matching how chord charts conventionally
+// notate omissions: x..., xx..., never .x..).
+const VOICING_MAX_FRET = 14;
+const VOICING_MAX_SPAN = 3;
+const VOICING_MIN_PLAYED = 3;
+// Hard cap on rendered voicings — extended chords (13ths) can otherwise
+// produce 10k+ minor variants. Simple ones are ranked first, so this keeps
+// the practical voicings without exploding the UI.
+const VOICING_DISPLAY_LIMIT = 150;
+
+const VoicingCache = {};
+
+function getNoteAtFret(stringIdx, fret) {
+    return ChromaticScale[(StringPC[stringIdx] + fret) % 12];
+}
+
+function generateAllVoicings(rootNote, chordType) {
+    const cacheKey = rootNote + '|' + chordType;
+    if (VoicingCache[cacheKey]) return VoicingCache[cacheKey];
+
+    const chordInfo = ChordTheory[chordType];
+    if (!chordInfo) {
+        VoicingCache[cacheKey] = [];
+        return [];
     }
-});
+
+    const rootPC = ChromaticScale.indexOf(rootNote);
+    const targetPCs = new Set(chordInfo.intervals.map(i => (rootPC + i) % 12));
+    // For dense chords (>=5 chord tones, e.g. 9ths, 13ths) we accept voicings
+    // with any 4 of them — that's how guitarists actually play those.
+    const minUniquePCs = Math.min(targetPCs.size, 4);
+
+    const voicings = [];
+    const seen = new Set();
+
+    // All-open / mute-only voicings (no fretted notes).
+    enumerateVoicings(0, [], false, rootPC, targetPCs, minUniquePCs, 0, voicings, seen);
+    // Voicings whose lowest fretted note sits at exactly winLow.
+    for (let winLow = 1; winLow <= VOICING_MAX_FRET; winLow++) {
+        enumerateVoicings(0, [], false, rootPC, targetPCs, minUniquePCs, winLow, voicings, seen);
+    }
+
+    const scored = voicings.map(v => {
+        const fingering = assignFingers(v.frets);
+        return Object.assign({}, v, fingering, {
+            score: scoreVoicing(v.frets, rootPC, fingering),
+        });
+    });
+    // Collapse voicings with identical fretted positions but differing
+    // mute state on low E / A — the diagrams look near-identical and the
+    // user only needs to see one. Keep the highest-scoring representative.
+    const byFingering = new Map();
+    for (const v of scored) {
+        const key = v.frets
+            .map((f, i) => (typeof f === 'number' && f > 0) ? `${i}:${f}` : '')
+            .filter(s => s)
+            .join('|');
+        const existing = byFingering.get(key);
+        if (!existing || v.score > existing.score) byFingering.set(key, v);
+    }
+    const deduped = Array.from(byFingering.values());
+    deduped.sort((a, b) => b.score - a.score);
+
+    VoicingCache[cacheKey] = deduped;
+    return deduped;
+}
+
+function enumerateVoicings(stringIdx, current, hitWinLow, rootPC, targetPCs, minUnique, winLow, output, seen) {
+    if (stringIdx === 6) {
+        const played = [];
+        const fretted = [];
+        for (let i = 0; i < 6; i++) {
+            if (current[i] !== 'x') {
+                played.push(current[i]);
+                if (current[i] > 0) fretted.push(current[i]);
+            }
+        }
+        if (played.length < VOICING_MIN_PLAYED) return;
+        // Avoid double-counting: when winLow > 0, this branch is responsible
+        // only for voicings whose lowest fretted fret is exactly winLow.
+        if (winLow > 0 && !hitWinLow) return;
+        if (winLow === 0 && fretted.length > 0) return;
+        if (fretted.length > 0) {
+            const span = Math.max(...fretted) - Math.min(...fretted);
+            if (span > VOICING_MAX_SPAN) return;
+        }
+        const pcs = new Set();
+        for (let i = 0; i < 6; i++) {
+            if (current[i] !== 'x') pcs.add((StringPC[i] + current[i]) % 12);
+        }
+        if (!pcs.has(rootPC)) return;
+        if (pcs.size < minUnique) return;
+
+        const key = current.join(',');
+        if (seen.has(key)) return;
+        seen.add(key);
+        output.push({ frets: current.slice() });
+        return;
+    }
+
+    // Mute this string. Allowed only on string 0 (low E) always, or on
+    // string 1 (A) when string 0 is already muted (prefix-mute rule).
+    const canMute = stringIdx === 0 || (stringIdx === 1 && current[0] === 'x');
+    if (canMute) {
+        current.push('x');
+        enumerateVoicings(stringIdx + 1, current, hitWinLow, rootPC, targetPCs, minUnique, winLow, output, seen);
+        current.pop();
+    }
+
+    // Open string, if its open note belongs to the chord.
+    if (targetPCs.has(StringPC[stringIdx])) {
+        current.push(0);
+        enumerateVoicings(stringIdx + 1, current, hitWinLow, rootPC, targetPCs, minUnique, winLow, output, seen);
+        current.pop();
+    }
+
+    // Fretted notes inside the [winLow, winLow + SPAN] window.
+    if (winLow > 0) {
+        const endFret = Math.min(winLow + VOICING_MAX_SPAN, VOICING_MAX_FRET);
+        for (let fret = winLow; fret <= endFret; fret++) {
+            const pc = (StringPC[stringIdx] + fret) % 12;
+            if (targetPCs.has(pc)) {
+                current.push(fret);
+                enumerateVoicings(stringIdx + 1, current, hitWinLow || fret === winLow, rootPC, targetPCs, minUnique, winLow, output, seen);
+                current.pop();
+            }
+        }
+    }
+}
+
+function assignFingers(frets) {
+    const fretted = [];
+    for (let i = 0; i < 6; i++) {
+        if (typeof frets[i] === 'number' && frets[i] > 0) {
+            fretted.push({ string: i, fret: frets[i] });
+        }
+    }
+    if (fretted.length === 0) {
+        return { fingers: frets.map(() => 0), barre: null };
+    }
+    const minFret = Math.min(...fretted.map(x => x.fret));
+    const atMin = fretted.filter(x => x.fret === minFret);
+    const aboveMin = fretted.filter(x => x.fret > minFret).sort(
+        (a, b) => a.fret - b.fret || a.string - b.string
+    );
+
+    const fingerMap = {};
+    let barre = null;
+
+    if (atMin.length >= 2) {
+        const minStr = Math.min(...atMin.map(x => x.string));
+        const maxStr = Math.max(...atMin.map(x => x.string));
+        // A barre conflicts with any open string between its endpoints.
+        let feasible = true;
+        for (let s = minStr; s <= maxStr; s++) {
+            if (frets[s] === 0) { feasible = false; break; }
+        }
+        if (feasible) {
+            atMin.forEach(({ string }) => { fingerMap[string] = 1; });
+            barre = { finger: 1, fromString: minStr, toString: maxStr, fret: minFret };
+            let nextFinger = 2;
+            for (const { string } of aboveMin) {
+                fingerMap[string] = Math.min(nextFinger++, 4);
+            }
+        }
+    }
+
+    if (!barre) {
+        const ordered = fretted.slice().sort(
+            (a, b) => a.fret - b.fret || a.string - b.string
+        );
+        let nextFinger = 1;
+        for (const { string } of ordered) {
+            fingerMap[string] = Math.min(nextFinger++, 4);
+        }
+    }
+
+    const fingers = frets.map((f, i) => {
+        if (typeof f !== 'number' || f <= 0) return 0;
+        return fingerMap[i] || 0;
+    });
+    return { fingers, barre };
+}
+
+function scoreVoicing(frets, rootPC, fingering) {
+    let score = 1000;
+    const opens = [];
+    const fretted = [];
+    let firstPlayed = -1;
+    let lastPlayed = -1;
+    let played = 0;
+    for (let i = 0; i < 6; i++) {
+        if (frets[i] === 'x') continue;
+        played++;
+        if (firstPlayed === -1) firstPlayed = i;
+        lastPlayed = i;
+        if (frets[i] === 0) opens.push(i);
+        else fretted.push(frets[i]);
+    }
+
+    // Lower fret position is simpler.
+    if (fretted.length > 0) score -= Math.min(...fretted) * 4;
+    // Compact span is simpler.
+    if (fretted.length > 1) score -= (Math.max(...fretted) - Math.min(...fretted)) * 6;
+    // Open strings drop the difficulty bar substantially.
+    score += opens.length * 18;
+    // More played strings = more standard / fuller sound.
+    score += played * 4;
+    // A muted string between two played strings is awkward to mute cleanly.
+    let gaps = 0;
+    for (let i = firstPlayed; i <= lastPlayed; i++) {
+        if (frets[i] === 'x') gaps++;
+    }
+    score -= gaps * 35;
+    // Root in the bass is the most natural-sounding voicing.
+    if (firstPlayed !== -1) {
+        const f = frets[firstPlayed];
+        if ((StringPC[firstPlayed] + f) % 12 === rootPC) score += 25;
+    }
+    // Barre = one finger doing extra work; small bonus over independent fingers.
+    if (fingering.barre) score += 6;
+    // Penalize fingerings that need more than 4 independent fingers.
+    const independentFingers = fingering.barre
+        ? fretted.filter(f => f !== fingering.barre.fret).length + 1
+        : fretted.length;
+    if (independentFingers > 4) score -= (independentFingers - 4) * 80;
+    return score;
+}
+
+function voicingToShape(voicing, rootNote) {
+    const rootPC = ChromaticScale.indexOf(rootNote);
+    let rootStringIdx = -1;
+    for (let i = 0; i < 6; i++) {
+        const f = voicing.frets[i];
+        if (f === 'x') continue;
+        if ((StringPC[i] + f) % 12 === rootPC) { rootStringIdx = i; break; }
+    }
+    if (rootStringIdx === -1) {
+        for (let i = 0; i < 6; i++) {
+            if (voicing.frets[i] !== 'x') { rootStringIdx = i; break; }
+        }
+    }
+    // The renderer derives baseFret as (rootPC - rootStringOpenPC) mod 12.
+    const rendererBase = ((rootPC - StringPC[rootStringIdx]) % 12 + 12) % 12;
+
+    const strings = voicing.frets.map((f, i) => {
+        if (f === 'x') return { rel: 'x', finger: 0 };
+        return { rel: f - rendererBase, finger: voicing.fingers[i] };
+    });
+    let barre = null;
+    if (voicing.barre) {
+        barre = {
+            finger: voicing.barre.finger,
+            fromString: voicing.barre.fromString,
+            toString: voicing.barre.toString,
+            relFret: voicing.barre.fret - rendererBase,
+        };
+    }
+    return { rootString: rootStringIdx, strings, barre };
+}
+
+function renderChordDiagram(rootNote, shape) {
+    const rootPC = ChromaticScale.indexOf(rootNote);
+    const baseFret = ((rootPC - StringPC[shape.rootString]) % 12 + 12) % 12;
+
+    const stringInfo = shape.strings.map((s, idx) => {
+        if (s.rel === 'x') return { stringIdx: idx, mute: true };
+        const fret = baseFret + s.rel;
+        const isOpen = fret === 0;
+        const pcMatchesRoot = (StringPC[idx] + fret) % 12 === rootPC;
+        return {
+            stringIdx: idx,
+            fret: fret,
+            finger: isOpen ? 0 : s.finger,
+            note: getNoteAtFret(idx, fret),
+            isRoot: !isOpen && pcMatchesRoot,
+            isOpenRoot: isOpen && pcMatchesRoot,
+        };
+    });
+
+    const fretted = stringInfo.filter(s => !s.mute && s.fret > 0);
+    const minPlayed = fretted.length ? Math.min(...fretted.map(s => s.fret)) : 1;
+    const maxPlayed = fretted.length ? Math.max(...fretted.map(s => s.fret)) : 4;
+
+    let displayStart;
+    if (minPlayed <= 4) {
+        displayStart = 1;
+    } else {
+        displayStart = minPlayed;
+    }
+    const displayFretCount = Math.max(4, maxPlayed - displayStart + 1);
+    const displayEnd = displayStart + displayFretCount - 1;
+    const showNut = displayStart === 1;
+
+    const stringSpacing = 32;
+    const fretSpacing = 50;
+    const startX = 36;
+    const startY = 50;
+    const nutHeight = showNut ? 7 : 0;
+    const W = startX + 5 * stringSpacing + 30;
+    const H = startY + nutHeight + displayFretCount * fretSpacing + 30;
+
+    let svg = `<svg width="${W}" height="${H}" xmlns="http://www.w3.org/2000/svg">`;
+
+    stringInfo.forEach(s => {
+        const x = startX + s.stringIdx * stringSpacing;
+        const y = startY - 14;
+        if (s.mute) {
+            svg += `<text x="${x}" y="${y + 4}" text-anchor="middle" font-size="18" fill="#666" font-family="Arial">×</text>`;
+        } else if (s.fret === 0) {
+            const stroke = s.isOpenRoot ? '#000' : '#444';
+            const sw = s.isOpenRoot ? 2.5 : 1.5;
+            svg += `<circle cx="${x}" cy="${y}" r="7" fill="white" stroke="${stroke}" stroke-width="${sw}"/>`;
+        }
+    });
+
+    if (showNut) {
+        svg += `<rect x="${startX - 1}" y="${startY}" width="${5 * stringSpacing + 2}" height="${nutHeight}" fill="#222"/>`;
+    }
+
+    for (let i = 1; i <= displayFretCount; i++) {
+        const y = startY + nutHeight + i * fretSpacing;
+        svg += `<line x1="${startX}" y1="${y}" x2="${startX + 5 * stringSpacing}" y2="${y}" stroke="#888" stroke-width="1.5"/>`;
+    }
+    for (let i = 0; i < 6; i++) {
+        const x = startX + i * stringSpacing;
+        const y1 = startY + nutHeight;
+        const y2 = startY + nutHeight + displayFretCount * fretSpacing;
+        svg += `<line x1="${x}" y1="${y1}" x2="${x}" y2="${y2}" stroke="#666" stroke-width="1.5"/>`;
+    }
+
+    // Fret number labels — one for each fret in the displayed range.
+    for (let i = 1; i <= displayFretCount; i++) {
+        const fretNum = displayStart + i - 1;
+        const y = startY + nutHeight + (i - 0.5) * fretSpacing + 4;
+        svg += `<text x="${startX - 6}" y="${y}" font-size="11" fill="#555" font-family="Arial" text-anchor="end">${fretNum}</text>`;
+    }
+
+    if (shape.barre && baseFret > 0) {
+        const barreFret = baseFret + shape.barre.relFret;
+        if (barreFret >= displayStart && barreFret <= displayEnd) {
+            const fretIdx = barreFret - displayStart + 1;
+            const cy = startY + nutHeight + (fretIdx - 0.5) * fretSpacing;
+            const x1 = startX + shape.barre.fromString * stringSpacing;
+            const x2 = startX + shape.barre.toString * stringSpacing;
+            const color = FingerColors[shape.barre.finger] || '#444';
+            svg += `<rect x="${x1 - 13}" y="${cy - 13}" width="${x2 - x1 + 26}" height="26" rx="13" fill="${color}" opacity="0.55"/>`;
+        }
+    }
+
+    stringInfo.forEach(s => {
+        if (s.mute || s.fret === 0) return;
+        if (s.fret < displayStart || s.fret > displayEnd) return;
+        const fretIdx = s.fret - displayStart + 1;
+        const cx = startX + s.stringIdx * stringSpacing;
+        const cy = startY + nutHeight + (fretIdx - 0.5) * fretSpacing;
+        const color = FingerColors[s.finger] || '#444';
+        const stroke = s.isRoot ? '#000' : '#222';
+        const sw = s.isRoot ? 2.5 : 1;
+        svg += `<circle cx="${cx}" cy="${cy}" r="14" fill="${color}" stroke="${stroke}" stroke-width="${sw}"/>`;
+        svg += `<text x="${cx}" y="${cy + 4}" text-anchor="middle" font-size="10" fill="white" font-family="Arial" font-weight="bold">${s.note}</text>`;
+    });
+
+    const labelY = startY + nutHeight + displayFretCount * fretSpacing + 18;
+    StringTuning.forEach((note, i) => {
+        const x = startX + i * stringSpacing;
+        svg += `<text x="${x}" y="${labelY}" text-anchor="middle" font-size="11" fill="#666" font-family="Arial">${note}</text>`;
+    });
+
+    svg += `</svg>`;
+    return svg;
+}
+
+function displayChordPatterns(rootNote, normalizedChordType) {
+    const section = document.getElementById('chord-patterns-section');
+    const tabsEl = document.getElementById('pattern-tabs');
+    const diagramEl = document.getElementById('pattern-diagram');
+    const legendEl = document.getElementById('finger-legend');
+
+    if (!ChordTheory[normalizedChordType]) {
+        section.style.display = 'none';
+        return;
+    }
+
+    const voicings = generateAllVoicings(rootNote, normalizedChordType);
+    if (!voicings.length) {
+        section.style.display = 'none';
+        return;
+    }
+
+    section.style.display = 'block';
+    legendEl.innerHTML = [1, 2, 3, 4].map(f =>
+        `<span class="finger-legend-item"><span class="finger-dot" style="background:${FingerColors[f]}"></span>${f} ${['Index','Middle','Ring','Pinky'][f-1]}</span>`
+    ).join('');
+
+    const total = voicings.length;
+    const display = voicings.slice(0, VOICING_DISPLAY_LIMIT);
+    const countLine = total > display.length
+        ? `Showing the ${display.length} simplest voicings (${total} total within a 4-fret window).`
+        : `${total} voicing${total === 1 ? '' : 's'} within a 4-fret window, sorted by simplicity.`;
+
+    tabsEl.innerHTML = `<div class="text-muted small mb-2">${countLine}</div>`;
+    display.forEach((voicing, i) => {
+        const fretted = voicing.frets.filter(f => typeof f === 'number' && f > 0);
+        const minFret = fretted.length ? Math.min(...fretted) : 0;
+        const positionLabel = minFret === 0 ? 'open' : `fret ${minFret}`;
+        const stringCount = voicing.frets.filter(f => f !== 'x').length;
+
+        const btn = document.createElement('button');
+        btn.type = 'button';
+        btn.className = 'btn btn-outline-primary me-2 mb-2 pattern-tab-btn';
+        btn.textContent = `Voicing ${i + 1} — ${positionLabel} (${stringCount} strings)`;
+        btn.addEventListener('click', () => {
+            tabsEl.querySelectorAll('.pattern-tab-btn').forEach(b => {
+                b.classList.remove('btn-primary');
+                b.classList.add('btn-outline-primary');
+            });
+            btn.classList.remove('btn-outline-primary');
+            btn.classList.add('btn-primary');
+            const shape = voicingToShape(voicing, rootNote);
+            diagramEl.innerHTML = renderChordDiagram(rootNote, shape);
+        });
+        tabsEl.appendChild(btn);
+    });
+
+    const first = tabsEl.querySelector('.pattern-tab-btn');
+    if (first) first.click();
+}
 
 
 
