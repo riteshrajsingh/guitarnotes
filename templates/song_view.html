@@ -1,0 +1,165 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>{{ song.title }}{% if song.artist %} — {{ song.artist }}{% endif %}</title>
+    <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.2.3/dist/css/bootstrap.min.css" rel="stylesheet">
+    <link href="https://cdn.jsdelivr.net/npm/bootstrap-icons@1.10.0/font/bootstrap-icons.css" rel="stylesheet">
+    <style>
+        :root {
+            --chord-color: #1e3a8a;
+            --section-color: #b91c1c;
+            --lyric-color: #1f2937;
+            --bg: #fafaf7;
+        }
+        body {
+            background: var(--bg);
+            font-family: 'Arial', sans-serif;
+            margin: 0;
+            padding-bottom: 4rem;
+        }
+        .song-header {
+            position: sticky;
+            top: 0;
+            z-index: 10;
+            background: white;
+            border-bottom: 1px solid #e5e7eb;
+            padding: 0.75rem 1rem;
+            display: flex;
+            align-items: center;
+            gap: 0.75rem;
+        }
+        .song-header-info { flex: 1; min-width: 0; }
+        .song-title {
+            font-size: 1.1rem;
+            font-weight: 700;
+            margin: 0;
+            color: #111;
+            white-space: nowrap;
+            overflow: hidden;
+            text-overflow: ellipsis;
+        }
+        .song-artist {
+            font-size: 0.85rem;
+            color: #6b7280;
+            white-space: nowrap;
+            overflow: hidden;
+            text-overflow: ellipsis;
+        }
+        .song-meta {
+            padding: 0.75rem 1rem;
+            color: #6b7280;
+            font-size: 0.9rem;
+            background: #fff;
+            border-bottom: 1px solid #f1f1f1;
+        }
+        .song-meta strong { color: #111; }
+        .song-content {
+            margin: 0;
+            padding: 1rem 1rem 2rem 1rem;
+            font-family: 'Menlo', 'Consolas', 'Courier New', monospace;
+            font-size: 1rem;
+            line-height: 1.6;
+            color: var(--lyric-color);
+            white-space: pre;
+            overflow-x: auto;
+            background: var(--bg);
+        }
+        .song-section {
+            display: inline-block;
+            color: var(--section-color);
+            font-weight: 700;
+            margin-top: 0.5rem;
+            font-size: 1.05em;
+        }
+        .song-chords {
+            display: inline-block;
+            color: var(--chord-color);
+            font-weight: 700;
+        }
+        .song-lyric {
+            display: inline-block;
+        }
+        .font-controls {
+            position: fixed;
+            bottom: 1rem;
+            right: 1rem;
+            background: white;
+            border: 1px solid #e5e7eb;
+            border-radius: 999px;
+            padding: 0.25rem;
+            display: flex;
+            gap: 0.25rem;
+            box-shadow: 0 4px 12px rgba(0,0,0,.1);
+            z-index: 5;
+        }
+        .font-controls button {
+            border: none;
+            background: transparent;
+            width: 36px;
+            height: 36px;
+            border-radius: 50%;
+            font-weight: 700;
+            color: #374151;
+            cursor: pointer;
+        }
+        .font-controls button:hover { background: #f3f4f6; }
+        @media (min-width: 768px) {
+            .song-content { font-size: 1.05rem; padding-left: 2rem; padding-right: 2rem; }
+            .song-title { font-size: 1.25rem; }
+        }
+    </style>
+</head>
+<body>
+    <div class="song-header">
+        <a href="{{ url_for('songs_list') }}" class="btn btn-sm btn-outline-secondary" aria-label="Back">
+            <i class="bi bi-arrow-left"></i>
+        </a>
+        <div class="song-header-info">
+            <div class="song-title">{{ song.title }}</div>
+            {% if song.artist %}<div class="song-artist">{{ song.artist }}</div>{% endif %}
+        </div>
+        {% if is_admin %}
+            <a href="{{ url_for('songs_admin_edit', song_id=song.id) }}" class="btn btn-sm btn-outline-primary" aria-label="Edit">
+                <i class="bi bi-pencil"></i>
+            </a>
+        {% endif %}
+    </div>
+
+    {% if song.key or song.capo %}
+        <div class="song-meta">
+            {% if song.key %}<strong>Key:</strong> {{ song.key }}{% endif %}
+            {% if song.key and song.capo %} &middot; {% endif %}
+            {% if song.capo %}<strong>Capo:</strong> {{ song.capo }}{% endif %}
+        </div>
+    {% endif %}
+
+    <pre class="song-content" id="song-content">{{ song.content|songfmt }}</pre>
+
+    <div class="font-controls" role="group" aria-label="Font size">
+        <button type="button" id="font-down" aria-label="Smaller text">A−</button>
+        <button type="button" id="font-up" aria-label="Larger text">A+</button>
+    </div>
+
+    <script>
+        // Font-size controls — persist across sessions per device.
+        (function () {
+            var content = document.getElementById('song-content');
+            var stored = parseFloat(localStorage.getItem('songFontSize'));
+            var size = isNaN(stored) ? 16 : stored;
+            function apply() {
+                content.style.fontSize = size + 'px';
+                localStorage.setItem('songFontSize', size);
+            }
+            apply();
+            document.getElementById('font-up').addEventListener('click', function () {
+                size = Math.min(size + 2, 32); apply();
+            });
+            document.getElementById('font-down').addEventListener('click', function () {
+                size = Math.max(size - 2, 12); apply();
+            });
+        })();
+    </script>
+</body>
+</html>

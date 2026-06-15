@@ -1,7 +1,15 @@
-from flask import Flask, render_template, request, send_from_directory
+from flask import Flask, render_template, request, send_from_directory, redirect, url_for, session, abort, flash
+from markupsafe import Markup, escape
+from functools import wraps
 import os
+import json
+import re
 
 app = Flask(__name__, static_url_path='/static', static_folder='static')
+# Required for Flask sessions / flash messages. Override in production via env var.
+app.secret_key = os.environ.get("FLASK_SECRET_KEY", "dev-secret-key-change-in-production")
+ADMIN_PASSWORD = os.environ.get("GUITAR_ADMIN_PASSWORD", "guitar")
+SONGS_FILE = os.path.join(os.path.dirname(os.path.abspath(__file__)), "songs.json")
 
 CHROMATIC_SCALE = ['A', 'A#', 'B', 'C', 'C#', 'D', 'D#', 'E', 'F', 'F#', 'G', 'G#',
                    'A', 'A#', 'B', 'C', 'C#', 'D', 'D#', 'E', 'F', 'F#', 'G', 'G#']
@@ -132,6 +140,187 @@ def capo_transposer():
 @app.route('/guitar/chord-library')
 def chord_library():
     return render_template('chord-library.html')
+
+
+# ===== Song Book =====
+# Public list/view, password-gated admin (add/edit/delete). Songs persist to
+# songs.json in the project directory.
+
+CHORD_TOKEN_RE = re.compile(
+    r'^[A-G][#b]?'                  # root
+    r'(?:m|maj|min|dim|aug)?'        # quality
+    r'(?:\d{1,2})?'                  # extension number (7, 11, 13)
+    r'(?:sus\d?)?'                   # suspension
+    r'(?:add\d{1,2})?'               # added tone
+    r'(?:/[A-G][#b]?)?'              # bass note
+    r'$'
+)
+SECTION_RE = re.compile(r'^\s*\[(.+)\]\s*$')
+SLUG_STRIP_RE = re.compile(r'[^a-zA-Z0-9\s-]')
+SLUG_DASH_RE = re.compile(r'[\s-]+')
+
+
+def load_songs():
+    if not os.path.exists(SONGS_FILE):
+        return []
+    with open(SONGS_FILE, 'r', encoding='utf-8') as f:
+        return json.load(f).get('songs', [])
+
+
+def save_songs(songs):
+    tmp = SONGS_FILE + '.tmp'
+    with open(tmp, 'w', encoding='utf-8') as f:
+        json.dump({'songs': songs}, f, indent=2, ensure_ascii=False)
+    os.replace(tmp, SONGS_FILE)
+
+
+def find_song(songs, song_id):
+    return next((s for s in songs if s.get('id') == song_id), None)
+
+
+def slugify(text):
+    text = SLUG_STRIP_RE.sub('', text or '').strip().lower()
+    text = SLUG_DASH_RE.sub('-', text)
+    return text or 'song'
+
+
+def unique_slug(base, existing_ids):
+    slug = base
+    n = 2
+    while slug in existing_ids:
+        slug = f"{base}-{n}"
+        n += 1
+    return slug
+
+
+def is_chord_line(line):
+    tokens = line.split()
+    if not tokens:
+        return False
+    return all(CHORD_TOKEN_RE.match(t) for t in tokens)
+
+
+@app.template_filter('songfmt')
+def render_song_content(content):
+    """Render song content as a <pre> block with section / chord / lyric spans."""
+    if not content:
+        return Markup('')
+    out = []
+    for line in content.split('\n'):
+        sec = SECTION_RE.match(line)
+        if sec:
+            out.append(f'<span class="song-section">[{escape(sec.group(1))}]</span>')
+        elif is_chord_line(line):
+            out.append(f'<span class="song-chords">{escape(line)}</span>')
+        elif line.strip() == '':
+            out.append('')
+        else:
+            out.append(f'<span class="song-lyric">{escape(line)}</span>')
+    return Markup('\n'.join(out))
+
+
+def admin_required(f):
+    @wraps(f)
+    def wrapper(*args, **kwargs):
+        if not session.get('is_admin'):
+            return redirect(url_for('songs_login', next=request.url))
+        return f(*args, **kwargs)
+    return wrapper
+
+
+@app.context_processor
+def inject_admin_flag():
+    return {'is_admin': bool(session.get('is_admin'))}
+
+
+@app.route('/guitar/songs')
+def songs_list():
+    songs = sorted(load_songs(), key=lambda s: s.get('title', '').lower())
+    return render_template('songs_list.html', songs=songs)
+
+
+@app.route('/guitar/songs/login', methods=['GET', 'POST'])
+def songs_login():
+    error = None
+    next_url = request.values.get('next') or url_for('songs_admin')
+    if request.method == 'POST':
+        if request.form.get('password') == ADMIN_PASSWORD:
+            session['is_admin'] = True
+            return redirect(next_url)
+        error = 'Incorrect password.'
+    return render_template('songs_login.html', error=error, next=next_url)
+
+
+@app.route('/guitar/songs/logout')
+def songs_logout():
+    session.pop('is_admin', None)
+    return redirect(url_for('songs_list'))
+
+
+@app.route('/guitar/songs/admin')
+@admin_required
+def songs_admin():
+    songs = sorted(load_songs(), key=lambda s: s.get('title', '').lower())
+    return render_template('songs_admin.html', songs=songs, song=None)
+
+
+@app.route('/guitar/songs/admin/new', methods=['POST'])
+@admin_required
+def songs_admin_new():
+    title = (request.form.get('title') or '').strip()
+    if not title:
+        flash('Title is required.')
+        return redirect(url_for('songs_admin'))
+    songs = load_songs()
+    sid = unique_slug(slugify(title), {s['id'] for s in songs})
+    songs.append({
+        'id': sid,
+        'title': title,
+        'artist': (request.form.get('artist') or '').strip(),
+        'key': (request.form.get('key') or '').strip(),
+        'capo': (request.form.get('capo') or '').strip(),
+        'content': request.form.get('content') or '',
+    })
+    save_songs(songs)
+    return redirect(url_for('song_view', song_id=sid))
+
+
+@app.route('/guitar/songs/admin/<song_id>', methods=['GET', 'POST'])
+@admin_required
+def songs_admin_edit(song_id):
+    songs = load_songs()
+    song = find_song(songs, song_id)
+    if not song:
+        abort(404)
+    if request.method == 'POST':
+        new_title = (request.form.get('title') or '').strip()
+        if new_title:
+            song['title'] = new_title
+        song['artist'] = (request.form.get('artist') or '').strip()
+        song['key'] = (request.form.get('key') or '').strip()
+        song['capo'] = (request.form.get('capo') or '').strip()
+        song['content'] = request.form.get('content') or ''
+        save_songs(songs)
+        return redirect(url_for('song_view', song_id=song_id))
+    all_songs = sorted(songs, key=lambda s: s.get('title', '').lower())
+    return render_template('songs_admin.html', songs=all_songs, song=song)
+
+
+@app.route('/guitar/songs/admin/<song_id>/delete', methods=['POST'])
+@admin_required
+def songs_admin_delete(song_id):
+    songs = load_songs()
+    songs = [s for s in songs if s.get('id') != song_id]
+    save_songs(songs)
+    return redirect(url_for('songs_admin'))
+
+
+@app.route('/guitar/songs/<song_id>')
+def song_view(song_id):
+    song = find_song(load_songs(), song_id)
+    if not song:
+        abort(404)
+    return render_template('song_view.html', song=song)
 
 
 if __name__ == "__main__":
