@@ -29,11 +29,73 @@
         .song-card-artist { color: #6b7280; font-size: 0.95rem; margin-top: 0.15rem; }
         .song-card-meta { color: #9ca3af; font-size: 0.85rem; margin-top: 0.15rem; }
         .empty-state { text-align: center; padding: 3rem 1rem; color: #6b7280; }
+
+        .search-bar {
+            position: sticky;
+            top: 0;
+            z-index: 10;
+            background: #f4f4f4;
+            padding: 0.75rem 0;
+            margin-bottom: 0.5rem;
+        }
+        .search-box { position: relative; }
+        .search-box input {
+            padding-right: 40px;
+            font-size: 1rem;
+            height: 48px;
+        }
+        .search-clear {
+            position: absolute;
+            right: 6px;
+            top: 50%;
+            transform: translateY(-50%);
+            background: transparent;
+            border: none;
+            color: #6b7280;
+            font-size: 1.4rem;
+            line-height: 1;
+            padding: 6px 12px;
+            cursor: pointer;
+            display: none;
+            border-radius: 6px;
+        }
+        .search-clear:hover { background: #e5e7eb; }
+        .search-clear.visible { display: block; }
+        .results-meta { color: #6b7280; font-size: 0.85rem; margin-bottom: 0.75rem; }
+
+        .pagination-row {
+            display: flex;
+            flex-wrap: wrap;
+            gap: 0.25rem;
+            justify-content: center;
+            margin-top: 1rem;
+            margin-bottom: 1rem;
+        }
+        .page-btn {
+            min-width: 40px;
+            height: 40px;
+            padding: 0 12px;
+            border: 1px solid #d1d5db;
+            background: white;
+            color: #374151;
+            border-radius: 6px;
+            cursor: pointer;
+            font-size: 0.95rem;
+        }
+        .page-btn:hover:not(:disabled):not(.active) { background: #f3f4f6; }
+        .page-btn:disabled { color: #9ca3af; cursor: not-allowed; opacity: 0.5; }
+        .page-btn.active {
+            background: #2563eb;
+            color: white;
+            border-color: #2563eb;
+        }
+        .page-ellipsis { padding: 0 0.5rem; color: #6b7280; align-self: center; }
+        .empty-search-results { text-align: center; padding: 2rem 1rem; color: #6b7280; }
     </style>
 </head>
 <body>
     <div class="container py-4" style="max-width: 720px;">
-        <div class="d-flex align-items-center justify-content-between mb-4 flex-wrap gap-2">
+        <div class="d-flex align-items-center justify-content-between mb-3 flex-wrap gap-2">
             <div>
                 <h1 class="h3 fw-bold mb-1">Song Book</h1>
                 <a href="{{ url_for('guitar_landing') }}" class="text-decoration-none text-muted small">
@@ -57,21 +119,42 @@
         </div>
 
         {% if songs %}
-            {% for song in songs %}
-                <a href="{{ url_for('song_view', song_id=song.id) }}" class="song-card">
-                    <div class="song-card-title">{{ song.title }}</div>
-                    {% if song.artist %}
-                        <div class="song-card-artist">{{ song.artist }}</div>
-                    {% endif %}
-                    {% if song.key or song.capo %}
-                        <div class="song-card-meta">
-                            {% if song.key %}Key: {{ song.key }}{% endif %}
-                            {% if song.key and song.capo %} &middot; {% endif %}
-                            {% if song.capo %}Capo: {{ song.capo }}{% endif %}
-                        </div>
-                    {% endif %}
-                </a>
-            {% endfor %}
+            <div class="search-bar">
+                <div class="search-box">
+                    <input type="search" id="search-input" class="form-control"
+                           placeholder="Search by title or artist..." autocomplete="off">
+                    <button type="button" id="search-clear" class="search-clear" aria-label="Clear search">&times;</button>
+                </div>
+            </div>
+
+            <div class="results-meta" id="results-meta"></div>
+
+            <div id="results-container">
+                {% for song in songs %}
+                    <a href="{{ url_for('song_view', song_id=song.id) }}" class="song-card js-song-card"
+                       data-title="{{ (song.title or '')|lower }}"
+                       data-artist="{{ (song.artist or '')|lower }}">
+                        <div class="song-card-title">{{ song.title }}</div>
+                        {% if song.artist %}
+                            <div class="song-card-artist">{{ song.artist }}</div>
+                        {% endif %}
+                        {% if song.key or song.capo %}
+                            <div class="song-card-meta">
+                                {% if song.key %}Key: {{ song.key }}{% endif %}
+                                {% if song.key and song.capo %} &middot; {% endif %}
+                                {% if song.capo %}Capo: {{ song.capo }}{% endif %}
+                            </div>
+                        {% endif %}
+                    </a>
+                {% endfor %}
+            </div>
+
+            <div class="empty-search-results" id="empty-search" style="display:none;">
+                <i class="bi bi-search display-4 d-block mb-3"></i>
+                <p class="mb-0">No songs match your search.</p>
+            </div>
+
+            <nav id="pagination-nav" aria-label="Pagination"></nav>
         {% else %}
             <div class="empty-state">
                 <i class="bi bi-music-note-list display-4 d-block mb-3"></i>
@@ -82,5 +165,129 @@
             </div>
         {% endif %}
     </div>
+
+    <script>
+        (function () {
+            var PER_PAGE = 20;
+            var cards = Array.prototype.slice.call(document.querySelectorAll('.js-song-card'));
+            if (!cards.length) return;
+            var input = document.getElementById('search-input');
+            var clearBtn = document.getElementById('search-clear');
+            var meta = document.getElementById('results-meta');
+            var nav = document.getElementById('pagination-nav');
+            var container = document.getElementById('results-container');
+            var emptyBox = document.getElementById('empty-search');
+
+            var query = '';
+            var page = 1;
+
+            function matching() {
+                var q = query.toLowerCase().trim();
+                if (!q) return cards.slice();
+                return cards.filter(function (c) {
+                    return (c.dataset.title || '').indexOf(q) >= 0
+                        || (c.dataset.artist || '').indexOf(q) >= 0;
+                });
+            }
+
+            function pageRange(p, total) {
+                var pages = {1: true};
+                pages[total] = true;
+                for (var i = p - 1; i <= p + 1; i++) {
+                    if (i >= 1 && i <= total) pages[i] = true;
+                }
+                var sorted = Object.keys(pages).map(Number).sort(function (a, b) { return a - b; });
+                var result = [];
+                var prev = 0;
+                for (var j = 0; j < sorted.length; j++) {
+                    if (sorted[j] - prev > 1) result.push('...');
+                    result.push(sorted[j]);
+                    prev = sorted[j];
+                }
+                return result;
+            }
+
+            function renderPagination(p, total) {
+                if (total <= 1) return '';
+                var parts = ['<div class="pagination-row">'];
+                parts.push('<button class="page-btn" data-page="' + (p - 1) + '"' + (p === 1 ? ' disabled' : '') + ' aria-label="Previous">&lsaquo;</button>');
+                var range = pageRange(p, total);
+                for (var i = 0; i < range.length; i++) {
+                    var pg = range[i];
+                    if (pg === '...') {
+                        parts.push('<span class="page-ellipsis">…</span>');
+                    } else {
+                        parts.push('<button class="page-btn' + (pg === p ? ' active' : '') + '" data-page="' + pg + '">' + pg + '</button>');
+                    }
+                }
+                parts.push('<button class="page-btn" data-page="' + (p + 1) + '"' + (p === total ? ' disabled' : '') + ' aria-label="Next">&rsaquo;</button>');
+                parts.push('</div>');
+                return parts.join('');
+            }
+
+            function render() {
+                var ms = matching();
+                var total = ms.length;
+                var totalPages = Math.max(1, Math.ceil(total / PER_PAGE));
+                if (page > totalPages) page = totalPages;
+                if (page < 1) page = 1;
+                var start = (page - 1) * PER_PAGE;
+                var end = Math.min(start + PER_PAGE, total);
+
+                cards.forEach(function (c) { c.style.display = 'none'; });
+
+                if (total === 0) {
+                    container.style.display = 'none';
+                    emptyBox.style.display = '';
+                    meta.textContent = '';
+                    nav.innerHTML = '';
+                    return;
+                }
+
+                emptyBox.style.display = 'none';
+                container.style.display = '';
+                ms.slice(start, end).forEach(function (c) { c.style.display = 'block'; });
+
+                if (query) {
+                    meta.textContent = total + ' song' + (total === 1 ? '' : 's') + ' matching "' + query + '"';
+                } else if (total > PER_PAGE) {
+                    meta.textContent = 'Showing ' + (start + 1) + '–' + end + ' of ' + total;
+                } else {
+                    meta.textContent = total + ' song' + (total === 1 ? '' : 's');
+                }
+
+                nav.innerHTML = renderPagination(page, totalPages);
+            }
+
+            input.addEventListener('input', function (e) {
+                query = e.target.value;
+                clearBtn.classList.toggle('visible', !!query);
+                page = 1;
+                render();
+            });
+
+            clearBtn.addEventListener('click', function () {
+                query = '';
+                input.value = '';
+                clearBtn.classList.remove('visible');
+                page = 1;
+                render();
+                input.focus();
+            });
+
+            nav.addEventListener('click', function (e) {
+                var btn = e.target.closest && e.target.closest('.page-btn');
+                if (!btn || btn.disabled) return;
+                var p = parseInt(btn.dataset.page, 10);
+                if (p > 0) {
+                    page = p;
+                    render();
+                    window.scrollTo({ top: 0, behavior: 'smooth' });
+                }
+            });
+
+            render();
+        })();
+    </script>
 </body>
 </html>

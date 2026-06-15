@@ -62,24 +62,26 @@
             font-size: 1rem;
             line-height: 1.6;
             color: var(--lyric-color);
-            white-space: pre;
             overflow-x: auto;
             background: var(--bg);
         }
+        .song-content > div {
+            white-space: pre;
+        }
         .song-section {
-            display: inline-block;
             color: var(--section-color);
             font-weight: 700;
             margin-top: 0.5rem;
             font-size: 1.05em;
         }
         .song-chords {
-            display: inline-block;
             color: var(--chord-color);
             font-weight: 700;
         }
-        .song-lyric {
-            display: inline-block;
+        .song-content.hide-chords .song-chords { display: none; }
+        .chord-toggle.is-off {
+            text-decoration: line-through;
+            opacity: 0.7;
         }
         .font-controls {
             position: fixed;
@@ -120,6 +122,10 @@
             <div class="song-title">{{ song.title }}</div>
             {% if song.artist %}<div class="song-artist">{{ song.artist }}</div>{% endif %}
         </div>
+        <button type="button" id="chord-toggle" class="btn btn-sm btn-primary chord-toggle"
+                aria-pressed="true" title="Show or hide chord lines">
+            <i class="bi bi-music-note"></i> Chords
+        </button>
         {% if is_admin %}
             <a href="{{ url_for('songs_admin_edit', song_id=song.id) }}" class="btn btn-sm btn-outline-primary" aria-label="Edit">
                 <i class="bi bi-pencil"></i>
@@ -135,7 +141,7 @@
         </div>
     {% endif %}
 
-    <pre class="song-content" id="song-content">{{ song.content|songfmt }}</pre>
+    <div class="song-content" id="song-content">{{ song.content|songfmt }}</div>
 
     <div class="font-controls" role="group" aria-label="Font size">
         <button type="button" id="font-down" aria-label="Smaller text">A−</button>
@@ -159,6 +165,31 @@
             document.getElementById('font-down').addEventListener('click', function () {
                 size = Math.max(size - 2, 12); apply();
             });
+        })();
+
+        // Chord visibility toggle — persist per device so singers don't have
+        // to keep flipping it. Default = show chords.
+        (function () {
+            var content = document.getElementById('song-content');
+            var btn = document.getElementById('chord-toggle');
+            var hide = localStorage.getItem('hideChords') === '1';
+
+            function apply() {
+                if (hide) {
+                    content.classList.add('hide-chords');
+                    btn.classList.remove('btn-primary');
+                    btn.classList.add('btn-outline-primary', 'is-off');
+                    btn.setAttribute('aria-pressed', 'false');
+                } else {
+                    content.classList.remove('hide-chords');
+                    btn.classList.add('btn-primary');
+                    btn.classList.remove('btn-outline-primary', 'is-off');
+                    btn.setAttribute('aria-pressed', 'true');
+                }
+                localStorage.setItem('hideChords', hide ? '1' : '0');
+            }
+            apply();
+            btn.addEventListener('click', function () { hide = !hide; apply(); });
         })();
     </script>
 </body>

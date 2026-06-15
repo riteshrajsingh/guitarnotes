@@ -202,20 +202,22 @@ def is_chord_line(line):
 
 @app.template_filter('songfmt')
 def render_song_content(content):
-    """Render song content as a <pre> block with section / chord / lyric spans."""
+    """Render song content as one <div> per line, classified as section /
+    chord / lyric / blank. Each line is its own block so 'hide chords' can
+    fully remove chord lines (no empty gaps left behind)."""
     if not content:
         return Markup('')
     out = []
     for line in content.split('\n'):
         sec = SECTION_RE.match(line)
         if sec:
-            out.append(f'<span class="song-section">[{escape(sec.group(1))}]</span>')
+            out.append(f'<div class="song-section">[{escape(sec.group(1))}]</div>')
         elif is_chord_line(line):
-            out.append(f'<span class="song-chords">{escape(line)}</span>')
+            out.append(f'<div class="song-chords">{escape(line)}</div>')
         elif line.strip() == '':
-            out.append('')
+            out.append('<div class="song-blank">&nbsp;</div>')
         else:
-            out.append(f'<span class="song-lyric">{escape(line)}</span>')
+            out.append(f'<div class="song-lyric">{escape(line)}</div>')
     return Markup('\n'.join(out))
 
 

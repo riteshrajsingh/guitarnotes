@@ -24,6 +24,50 @@
             margin-bottom: 1rem;
         }
         .form-help pre { margin: 0.5rem 0 0; font-size: 0.8rem; background: white; padding: 0.5rem; border-radius: 4px; }
+
+        .search-box { position: relative; margin-bottom: 0.5rem; }
+        .search-box input { padding-right: 40px; height: 42px; }
+        .search-clear {
+            position: absolute;
+            right: 6px;
+            top: 50%;
+            transform: translateY(-50%);
+            background: transparent;
+            border: none;
+            color: #6b7280;
+            font-size: 1.4rem;
+            line-height: 1;
+            padding: 4px 10px;
+            cursor: pointer;
+            display: none;
+            border-radius: 6px;
+        }
+        .search-clear:hover { background: #e5e7eb; }
+        .search-clear.visible { display: block; }
+        .results-meta { color: #6b7280; font-size: 0.85rem; margin-bottom: 0.5rem; }
+        .pagination-row {
+            display: flex;
+            flex-wrap: wrap;
+            gap: 0.25rem;
+            justify-content: center;
+            margin-top: 0.75rem;
+        }
+        .page-btn {
+            min-width: 36px;
+            height: 36px;
+            padding: 0 10px;
+            border: 1px solid #d1d5db;
+            background: white;
+            color: #374151;
+            border-radius: 6px;
+            cursor: pointer;
+            font-size: 0.9rem;
+        }
+        .page-btn:hover:not(:disabled):not(.active) { background: #f3f4f6; }
+        .page-btn:disabled { color: #9ca3af; cursor: not-allowed; opacity: 0.5; }
+        .page-btn.active { background: #2563eb; color: white; border-color: #2563eb; }
+        .page-ellipsis { padding: 0 0.4rem; color: #6b7280; align-self: center; }
+        .empty-search-results { text-align: center; padding: 1.5rem 1rem; color: #6b7280; }
     </style>
 </head>
 <body>
@@ -112,9 +156,17 @@ We will rock you</pre>
             <div class="card-body">
                 <h2 class="h5 fw-bold mb-3">All songs ({{ songs|length }})</h2>
                 {% if songs %}
-                    <div>
+                    <div class="search-box">
+                        <input type="search" id="admin-search" class="form-control"
+                               placeholder="Search by title or artist..." autocomplete="off">
+                        <button type="button" id="admin-search-clear" class="search-clear" aria-label="Clear search">&times;</button>
+                    </div>
+                    <div class="results-meta" id="admin-results-meta"></div>
+                    <div id="admin-results-container">
                         {% for s in songs %}
-                            <div class="song-row">
+                            <div class="song-row js-song-row"
+                                 data-title="{{ (s.title or '')|lower }}"
+                                 data-artist="{{ (s.artist or '')|lower }}">
                                 <a href="{{ url_for('song_view', song_id=s.id) }}">
                                     <div class="row-title">{{ s.title }}</div>
                                     {% if s.artist %}
@@ -137,11 +189,138 @@ We will rock you</pre>
                             </div>
                         {% endfor %}
                     </div>
+                    <div class="empty-search-results" id="admin-empty-search" style="display:none;">
+                        No songs match your search.
+                    </div>
+                    <nav id="admin-pagination-nav" aria-label="Pagination"></nav>
                 {% else %}
                     <p class="text-muted mb-0">No songs yet. Add your first one above.</p>
                 {% endif %}
             </div>
         </div>
     </div>
+
+    <script>
+        (function () {
+            var PER_PAGE = 25;
+            var rows = Array.prototype.slice.call(document.querySelectorAll('.js-song-row'));
+            if (!rows.length) return;
+            var input = document.getElementById('admin-search');
+            var clearBtn = document.getElementById('admin-search-clear');
+            var meta = document.getElementById('admin-results-meta');
+            var nav = document.getElementById('admin-pagination-nav');
+            var container = document.getElementById('admin-results-container');
+            var emptyBox = document.getElementById('admin-empty-search');
+
+            var query = '';
+            var page = 1;
+
+            function matching() {
+                var q = query.toLowerCase().trim();
+                if (!q) return rows.slice();
+                return rows.filter(function (r) {
+                    return (r.dataset.title || '').indexOf(q) >= 0
+                        || (r.dataset.artist || '').indexOf(q) >= 0;
+                });
+            }
+
+            function pageRange(p, total) {
+                var pages = {1: true};
+                pages[total] = true;
+                for (var i = p - 1; i <= p + 1; i++) {
+                    if (i >= 1 && i <= total) pages[i] = true;
+                }
+                var sorted = Object.keys(pages).map(Number).sort(function (a, b) { return a - b; });
+                var result = [];
+                var prev = 0;
+                for (var j = 0; j < sorted.length; j++) {
+                    if (sorted[j] - prev > 1) result.push('...');
+                    result.push(sorted[j]);
+                    prev = sorted[j];
+                }
+                return result;
+            }
+
+            function renderPagination(p, total) {
+                if (total <= 1) return '';
+                var parts = ['<div class="pagination-row">'];
+                parts.push('<button class="page-btn" data-page="' + (p - 1) + '"' + (p === 1 ? ' disabled' : '') + ' aria-label="Previous">&lsaquo;</button>');
+                var range = pageRange(p, total);
+                for (var i = 0; i < range.length; i++) {
+                    var pg = range[i];
+                    if (pg === '...') {
+                        parts.push('<span class="page-ellipsis">…</span>');
+                    } else {
+                        parts.push('<button class="page-btn' + (pg === p ? ' active' : '') + '" data-page="' + pg + '">' + pg + '</button>');
+                    }
+                }
+                parts.push('<button class="page-btn" data-page="' + (p + 1) + '"' + (p === total ? ' disabled' : '') + ' aria-label="Next">&rsaquo;</button>');
+                parts.push('</div>');
+                return parts.join('');
+            }
+
+            function render() {
+                var ms = matching();
+                var total = ms.length;
+                var totalPages = Math.max(1, Math.ceil(total / PER_PAGE));
+                if (page > totalPages) page = totalPages;
+                if (page < 1) page = 1;
+                var start = (page - 1) * PER_PAGE;
+                var end = Math.min(start + PER_PAGE, total);
+
+                rows.forEach(function (r) { r.style.display = 'none'; });
+
+                if (total === 0) {
+                    container.style.display = 'none';
+                    emptyBox.style.display = '';
+                    meta.textContent = '';
+                    nav.innerHTML = '';
+                    return;
+                }
+
+                emptyBox.style.display = 'none';
+                container.style.display = '';
+                ms.slice(start, end).forEach(function (r) { r.style.display = 'flex'; });
+
+                if (query) {
+                    meta.textContent = total + ' match' + (total === 1 ? '' : 'es');
+                } else if (total > PER_PAGE) {
+                    meta.textContent = 'Showing ' + (start + 1) + '–' + end + ' of ' + total;
+                } else {
+                    meta.textContent = '';
+                }
+
+                nav.innerHTML = renderPagination(page, totalPages);
+            }
+
+            input.addEventListener('input', function (e) {
+                query = e.target.value;
+                clearBtn.classList.toggle('visible', !!query);
+                page = 1;
+                render();
+            });
+
+            clearBtn.addEventListener('click', function () {
+                query = '';
+                input.value = '';
+                clearBtn.classList.remove('visible');
+                page = 1;
+                render();
+                input.focus();
+            });
+
+            nav.addEventListener('click', function (e) {
+                var btn = e.target.closest && e.target.closest('.page-btn');
+                if (!btn || btn.disabled) return;
+                var p = parseInt(btn.dataset.page, 10);
+                if (p > 0) {
+                    page = p;
+                    render();
+                }
+            });
+
+            render();
+        })();
+    </script>
 </body>
 </html>
