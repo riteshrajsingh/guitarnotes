@@ -90,10 +90,11 @@ def home():
     return render_template('index.html')
 
 @app.route('/guitar')
+@app.route('/guitar/')
 def guitar_landing():
     return render_template('main.html')
 
-@app.route('/scales')
+@app.route('/guitar/scales')
 def scales():
     return render_template('scales.html')
 
@@ -102,21 +103,21 @@ def serve_guitar_sample(string_folder, filename):
     base_dir = os.path.dirname(os.path.abspath(__file__))
     samples_dir = os.path.join(base_dir, 'guitar-samples')
     relative_file_path = os.path.join(string_folder, filename)
-    
+
     try:
         return send_from_directory(samples_dir, relative_file_path)
     except FileNotFoundError:
         return "Sample not found", 404
 
-@app.route('/ear-training')
+@app.route('/guitar/ear-training')
 def ear_training():
     return render_template('ear_training.html')
 
-@app.route('/identify_notes')
+@app.route('/guitar/identify_notes')
 def identify_notes():
     return render_template('identify_notes.html')
 
-@app.route("/capo-transpose", methods=["GET", "POST"])
+@app.route("/guitar/capo-transpose", methods=["GET", "POST"])
 def capo_transposer():
     capo_positions = None
     selected_chords = None
@@ -128,7 +129,7 @@ def capo_transposer():
         capo_positions = get_capo_patterns(selected_chords)
     return render_template("capo-transpose.html", capo_positions=capo_positions, selected_chords=selected_chords)
 
-@app.route('/chord-library')
+@app.route('/guitar/chord-library')
 def chord_library():
     return render_template('chord-library.html')
 
