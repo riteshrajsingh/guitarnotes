@@ -1,0 +1,383 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Chord Recorder · Admin</title>
+    <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.2.3/dist/css/bootstrap.min.css" rel="stylesheet">
+    <link href="https://cdn.jsdelivr.net/npm/bootstrap-icons@1.10.0/font/bootstrap-icons.css" rel="stylesheet">
+    <style>
+        body { background-color: #f4f4f4; font-family: 'Arial', sans-serif; }
+        .legend { display: flex; gap: 18px; align-items: center; }
+        .dot { display: inline-block; width: 10px; height: 10px; border-radius: 50%; margin-right: 6px; vertical-align: middle; }
+        .dot.recorded { background: #198754; }
+        .dot.empty { background: #adb5bd; }
+        .chord-grid {
+            display: grid;
+            grid-template-columns: 160px repeat(12, minmax(64px, 1fr));
+            gap: 4px;
+            background: #fff;
+            border: 1px solid #dee2e6;
+            border-radius: 8px;
+            padding: 10px;
+            overflow-x: auto;
+        }
+        .grid-header, .row-label {
+            font-weight: 600;
+            color: #495057;
+            font-size: 0.85rem;
+            text-align: center;
+            padding: 6px 4px;
+        }
+        .row-label { text-align: left; }
+        .chord-cell {
+            padding: 8px 4px;
+            text-align: center;
+            border: 1px solid #dee2e6;
+            border-radius: 6px;
+            cursor: pointer;
+            background: #fff;
+            font-size: 0.95rem;
+            font-weight: 500;
+            transition: all 0.1s ease-in-out;
+            position: relative;
+        }
+        .chord-cell:hover { background: #e9ecef; }
+        .chord-cell.recorded { background: #d1e7dd; border-color: #198754; }
+        .chord-cell.recorded:hover { background: #b6dfc8; }
+        .chord-cell.selected { outline: 3px solid #0d6efd; outline-offset: -2px; }
+        .chord-cell .indicator {
+            position: absolute;
+            top: 3px;
+            right: 4px;
+            font-size: 0.6rem;
+        }
+        .editor {
+            background: #fff;
+            border: 1px solid #dee2e6;
+            border-radius: 8px;
+            padding: 18px;
+            margin-top: 18px;
+            min-height: 220px;
+        }
+        .editor.placeholder { color: #6c757d; font-style: italic; text-align: center; padding: 60px 18px; }
+        .recording-pulse {
+            display: inline-block;
+            width: 10px; height: 10px; border-radius: 50%;
+            background: #dc3545;
+            margin-right: 8px;
+            animation: pulse 1s infinite;
+        }
+        @keyframes pulse { 0% { opacity: 1; } 50% { opacity: 0.3; } 100% { opacity: 1; } }
+        .timer { font-variant-numeric: tabular-nums; font-weight: 600; }
+        .small-muted { color: #6c757d; font-size: 0.85rem; }
+        audio { width: 100%; max-width: 480px; }
+    </style>
+</head>
+<body>
+<div class="container py-4">
+    <div class="d-flex flex-wrap justify-content-between align-items-center mb-3">
+        <div>
+            <h1 class="h3 fw-bold mb-1">Chord Recorder</h1>
+            <p class="small-muted mb-0">Record live from your guitar or upload a file. Saved recordings replace the synthesized chord in <a href="{{ url_for('chord_ear_training') }}">Chord Ear Training</a>.</p>
+        </div>
+        <div class="d-flex gap-2 align-items-center">
+            <span class="legend small-muted">
+                <span><span class="dot recorded"></span>recorded</span>
+                <span><span class="dot empty"></span>not recorded</span>
+            </span>
+            <a href="{{ url_for('guitar_landing') }}" class="btn btn-outline-secondary btn-sm">
+                <i class="bi bi-arrow-left"></i> Home
+            </a>
+        </div>
+    </div>
+
+    <div class="chord-grid" id="chord-grid">
+        <div class="grid-header"></div>
+        {% for r in roots %}
+            <div class="grid-header">{{ r }}</div>
+        {% endfor %}
+        {% for t in types %}
+            <div class="row-label">{{ t }}<br><span class="small-muted">{{ suffixes[t] or '(maj)' }}</span></div>
+            {% for r in roots %}
+                {% set key = r ~ '|' ~ t %}
+                <div class="chord-cell {% if existing.get(key) %}recorded{% endif %}"
+                     data-root="{{ r }}" data-type="{{ t }}" data-suffix="{{ suffixes[t] }}"
+                     {% if existing.get(key) %}data-url="{{ existing[key] }}"{% endif %}>
+                    {{ r }}{{ suffixes[t] }}
+                    <span class="indicator">{% if existing.get(key) %}<i class="bi bi-check-circle-fill text-success"></i>{% else %}<i class="bi bi-circle text-secondary"></i>{% endif %}</span>
+                </div>
+            {% endfor %}
+        {% endfor %}
+    </div>
+
+    <div id="editor" class="editor placeholder">
+        Click a chord above to record or upload audio for it.
+    </div>
+</div>
+
+<script>
+const ManifestUrl = {{ url_for('chord_samples_manifest')|tojson }};
+const UploadUrl = {{ url_for('chord_recorder_upload')|tojson }};
+const DeleteUrl = {{ url_for('chord_recorder_delete')|tojson }};
+
+const editor = document.getElementById('editor');
+let selectedCell = null;
+let mediaRecorder = null;
+let recordedBlob = null;
+let recordedExt = null;
+let recordedChunks = [];
+let timerHandle = null;
+
+function pickRecorderMime() {
+    // Prefer formats the browser can play back via <audio> and Web Audio.
+    const candidates = [
+        { mime: 'audio/webm;codecs=opus', ext: 'webm' },
+        { mime: 'audio/webm', ext: 'webm' },
+        { mime: 'audio/mp4', ext: 'mp4' },
+        { mime: 'audio/mp4;codecs=mp4a.40.2', ext: 'mp4' },
+        { mime: 'audio/ogg;codecs=opus', ext: 'ogg' },
+    ];
+    if (typeof MediaRecorder === 'undefined' || !MediaRecorder.isTypeSupported) {
+        return { mime: '', ext: 'webm' };
+    }
+    for (const c of candidates) {
+        if (MediaRecorder.isTypeSupported(c.mime)) return c;
+    }
+    return { mime: '', ext: 'webm' };
+}
+
+function chordLabel(root, suffix) {
+    return `${root}${suffix || ''}`;
+}
+
+document.querySelectorAll('.chord-cell').forEach(cell => {
+    cell.addEventListener('click', () => selectCell(cell));
+});
+
+function selectCell(cell) {
+    if (selectedCell) selectedCell.classList.remove('selected');
+    selectedCell = cell;
+    cell.classList.add('selected');
+    stopRecordingIfAny();
+    renderEditor();
+}
+
+function renderEditor() {
+    if (!selectedCell) {
+        editor.className = 'editor placeholder';
+        editor.textContent = 'Click a chord above to record or upload audio for it.';
+        return;
+    }
+    const root = selectedCell.dataset.root;
+    const type = selectedCell.dataset.type;
+    const suffix = selectedCell.dataset.suffix;
+    const url = selectedCell.dataset.url || '';
+    editor.className = 'editor';
+    editor.innerHTML = `
+        <div class="d-flex flex-wrap justify-content-between align-items-center mb-3">
+            <div>
+                <h2 class="h4 mb-0">${chordLabel(root, suffix)} <span class="small-muted fw-normal">(${type})</span></h2>
+                <div class="small-muted">${url ? 'Recording on file. Re-record or replace below.' : 'No recording yet.'}</div>
+            </div>
+            <div>
+                ${url ? `<button class="btn btn-outline-danger btn-sm" id="delete-btn"><i class="bi bi-trash"></i> Delete</button>` : ''}
+            </div>
+        </div>
+
+        ${url ? `
+        <div class="mb-3">
+            <label class="form-label small-muted mb-1">Current recording</label>
+            <audio controls src="${url}?t=${Date.now()}"></audio>
+        </div>
+        ` : ''}
+
+        <div class="row g-3">
+            <div class="col-md-6">
+                <div class="border rounded p-3 h-100">
+                    <h3 class="h6">Record from microphone</h3>
+                    <div class="d-flex align-items-center gap-2 mb-2">
+                        <button class="btn btn-danger" id="rec-start"><i class="bi bi-record-circle"></i> Start</button>
+                        <button class="btn btn-secondary" id="rec-stop" disabled><i class="bi bi-stop-circle"></i> Stop</button>
+                        <span class="timer ms-2" id="rec-timer"></span>
+                    </div>
+                    <div id="rec-preview"></div>
+                </div>
+            </div>
+            <div class="col-md-6">
+                <div class="border rounded p-3 h-100">
+                    <h3 class="h6">Upload an audio file</h3>
+                    <input type="file" class="form-control form-control-sm mb-2" id="upload-input" accept="audio/*,.mp4,.m4a,.webm,.ogg,.wav,.mp3,.aac">
+                    <button class="btn btn-primary btn-sm" id="upload-btn" disabled><i class="bi bi-upload"></i> Upload</button>
+                    <div class="small-muted mt-2">Accepted: mp4, m4a, webm, ogg, wav, mp3, aac.</div>
+                </div>
+            </div>
+        </div>
+
+        <div id="status" class="mt-3 small"></div>
+    `;
+
+    document.getElementById('rec-start').addEventListener('click', startRecording);
+    document.getElementById('rec-stop').addEventListener('click', stopRecording);
+    const upInput = document.getElementById('upload-input');
+    const upBtn = document.getElementById('upload-btn');
+    upInput.addEventListener('change', () => { upBtn.disabled = !upInput.files.length; });
+    upBtn.addEventListener('click', () => uploadFile(upInput.files[0]));
+    if (url) {
+        document.getElementById('delete-btn').addEventListener('click', deleteRecording);
+    }
+}
+
+async function startRecording() {
+    setStatus('Requesting microphone…');
+    let stream;
+    try {
+        stream = await navigator.mediaDevices.getUserMedia({ audio: true });
+    } catch (err) {
+        setStatus(`Mic access denied: ${err.message}`, true);
+        return;
+    }
+    const { mime, ext } = pickRecorderMime();
+    recordedChunks = [];
+    recordedBlob = null;
+    recordedExt = ext;
+    try {
+        mediaRecorder = new MediaRecorder(stream, mime ? { mimeType: mime } : undefined);
+    } catch (err) {
+        setStatus(`Recorder unsupported: ${err.message}`, true);
+        stream.getTracks().forEach(t => t.stop());
+        return;
+    }
+    mediaRecorder.ondataavailable = (e) => { if (e.data && e.data.size) recordedChunks.push(e.data); };
+    mediaRecorder.onstop = () => {
+        stream.getTracks().forEach(t => t.stop());
+        recordedBlob = new Blob(recordedChunks, { type: mediaRecorder.mimeType || mime || `audio/${ext}` });
+        renderRecPreview();
+        clearTimer();
+    };
+    mediaRecorder.start();
+    document.getElementById('rec-start').disabled = true;
+    document.getElementById('rec-stop').disabled = false;
+    setStatus('');
+    startTimer();
+}
+
+function stopRecording() {
+    if (mediaRecorder && mediaRecorder.state !== 'inactive') {
+        mediaRecorder.stop();
+    }
+    document.getElementById('rec-start').disabled = false;
+    document.getElementById('rec-stop').disabled = true;
+}
+
+function stopRecordingIfAny() {
+    if (mediaRecorder && mediaRecorder.state === 'recording') {
+        mediaRecorder.onstop = null;
+        mediaRecorder.stop();
+        mediaRecorder.stream && mediaRecorder.stream.getTracks().forEach(t => t.stop());
+    }
+    mediaRecorder = null;
+    recordedBlob = null;
+    clearTimer();
+}
+
+function startTimer() {
+    const t0 = performance.now();
+    const el = document.getElementById('rec-timer');
+    el.innerHTML = `<span class="recording-pulse"></span>0.0s`;
+    timerHandle = setInterval(() => {
+        const secs = ((performance.now() - t0) / 1000).toFixed(1);
+        el.innerHTML = `<span class="recording-pulse"></span>${secs}s`;
+    }, 100);
+}
+function clearTimer() {
+    if (timerHandle) { clearInterval(timerHandle); timerHandle = null; }
+    const el = document.getElementById('rec-timer');
+    if (el) el.innerHTML = '';
+}
+
+function renderRecPreview() {
+    const wrap = document.getElementById('rec-preview');
+    if (!recordedBlob) { wrap.innerHTML = ''; return; }
+    const url = URL.createObjectURL(recordedBlob);
+    wrap.innerHTML = `
+        <audio controls src="${url}" class="mb-2"></audio>
+        <div>
+            <button class="btn btn-success btn-sm" id="save-rec-btn"><i class="bi bi-cloud-upload"></i> Save</button>
+            <button class="btn btn-outline-secondary btn-sm" id="discard-rec-btn">Discard</button>
+        </div>
+    `;
+    document.getElementById('save-rec-btn').addEventListener('click', saveRecording);
+    document.getElementById('discard-rec-btn').addEventListener('click', () => {
+        recordedBlob = null;
+        wrap.innerHTML = '';
+    });
+}
+
+async function saveRecording() {
+    if (!recordedBlob || !selectedCell) return;
+    const fd = new FormData();
+    fd.append('root', selectedCell.dataset.root);
+    fd.append('type', selectedCell.dataset.type);
+    fd.append('ext', recordedExt);
+    fd.append('audio', recordedBlob, `chord.${recordedExt}`);
+    await postUpload(fd);
+}
+
+async function uploadFile(file) {
+    if (!file || !selectedCell) return;
+    const ext = (file.name.split('.').pop() || '').toLowerCase();
+    const fd = new FormData();
+    fd.append('root', selectedCell.dataset.root);
+    fd.append('type', selectedCell.dataset.type);
+    fd.append('ext', ext);
+    fd.append('audio', file, file.name);
+    await postUpload(fd);
+}
+
+async function postUpload(fd) {
+    setStatus('Uploading…');
+    try {
+        const res = await fetch(UploadUrl, { method: 'POST', body: fd });
+        const data = await res.json();
+        if (!res.ok || !data.ok) throw new Error(data.error || `HTTP ${res.status}`);
+        selectedCell.dataset.url = data.url;
+        selectedCell.classList.add('recorded');
+        selectedCell.querySelector('.indicator').innerHTML = '<i class="bi bi-check-circle-fill text-success"></i>';
+        setStatus('Saved.', false, true);
+        renderEditor();
+    } catch (err) {
+        setStatus(`Upload failed: ${err.message}`, true);
+    }
+}
+
+async function deleteRecording() {
+    if (!selectedCell) return;
+    if (!confirm(`Delete recording for ${chordLabel(selectedCell.dataset.root, selectedCell.dataset.suffix)}?`)) return;
+    const fd = new FormData();
+    fd.append('root', selectedCell.dataset.root);
+    fd.append('type', selectedCell.dataset.type);
+    setStatus('Deleting…');
+    try {
+        const res = await fetch(DeleteUrl, { method: 'POST', body: fd });
+        const data = await res.json();
+        if (!res.ok || !data.ok) throw new Error(data.error || `HTTP ${res.status}`);
+        delete selectedCell.dataset.url;
+        selectedCell.classList.remove('recorded');
+        selectedCell.querySelector('.indicator').innerHTML = '<i class="bi bi-circle text-secondary"></i>';
+        setStatus('Deleted.', false, true);
+        renderEditor();
+    } catch (err) {
+        setStatus(`Delete failed: ${err.message}`, true);
+    }
+}
+
+function setStatus(msg, isError, isSuccess) {
+    const el = document.getElementById('status');
+    if (!el) return;
+    el.textContent = msg || '';
+    el.className = 'mt-3 small ' + (isError ? 'text-danger' : isSuccess ? 'text-success' : 'text-muted');
+}
+</script>
+</body>
+</html>

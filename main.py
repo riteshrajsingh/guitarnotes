@@ -442,5 +442,127 @@ def song_view(song_id):
     return render_template('song_view.html', song=song)
 
 
+# ===== Chord recordings =====
+# Per-chord audio recordings used by chord_ear_training.html. The trainer
+# falls back to per-string synthesis when a recording is missing.
+
+CHORD_SAMPLES_DIR = os.path.join(os.path.dirname(os.path.abspath(__file__)), 'chord-samples')
+
+CHORD_TYPES = {
+    'Major':        '',
+    'Minor':        'm',
+    'Diminished':   'dim',
+    'Augmented':    'aug',
+    'Sus2':         'sus2',
+    'Sus4':         'sus4',
+    'Major 7':      'maj7',
+    'Minor 7':      'm7',
+    'Dominant 7':   '7',
+    'Diminished 7': 'dim7',
+    'Half-Dim 7':   'm7b5',
+}
+CHORD_ROOTS = ['C', 'C#', 'D', 'D#', 'E', 'F', 'F#', 'G', 'G#', 'A', 'A#', 'B']
+CHORD_ALLOWED_EXTS = {'mp4', 'm4a', 'webm', 'ogg', 'wav', 'mp3', 'aac'}
+
+
+def chord_file_base(root, type_name):
+    if root not in CHORD_ROOTS or type_name not in CHORD_TYPES:
+        return None
+    return f"{root.replace('#', 's')}{CHORD_TYPES[type_name]}"
+
+
+def find_chord_file(base):
+    """Return (filename, ext) for an existing recording, or (None, None)."""
+    if not os.path.isdir(CHORD_SAMPLES_DIR):
+        return None, None
+    for ext in CHORD_ALLOWED_EXTS:
+        candidate = f"{base}.{ext}"
+        if os.path.exists(os.path.join(CHORD_SAMPLES_DIR, candidate)):
+            return candidate, ext
+    return None, None
+
+
+def remove_chord_files(base):
+    if not os.path.isdir(CHORD_SAMPLES_DIR):
+        return
+    for ext in CHORD_ALLOWED_EXTS:
+        path = os.path.join(CHORD_SAMPLES_DIR, f"{base}.{ext}")
+        if os.path.exists(path):
+            os.remove(path)
+
+
+def chord_samples_index():
+    out = {}
+    if os.path.isdir(CHORD_SAMPLES_DIR):
+        for root in CHORD_ROOTS:
+            for type_name in CHORD_TYPES:
+                base = chord_file_base(root, type_name)
+                fname, _ = find_chord_file(base)
+                if fname:
+                    out[f"{root}|{type_name}"] = url_for('serve_chord_sample', filename=fname)
+    return out
+
+
+@app.route('/chord-samples/<path:filename>')
+def serve_chord_sample(filename):
+    if '/' in filename or '\\' in filename or filename.startswith('.'):
+        abort(404)
+    try:
+        return send_from_directory(CHORD_SAMPLES_DIR, filename)
+    except FileNotFoundError:
+        abort(404)
+
+
+@app.route('/guitar/chord-samples-manifest.json')
+def chord_samples_manifest():
+    return chord_samples_index()
+
+
+@app.route('/guitar/chord-recorder')
+@admin_required
+def chord_recorder():
+    return render_template(
+        'chord_recorder.html',
+        roots=CHORD_ROOTS,
+        types=list(CHORD_TYPES.keys()),
+        suffixes=CHORD_TYPES,
+        existing=chord_samples_index(),
+    )
+
+
+@app.route('/guitar/chord-recorder/upload', methods=['POST'])
+@admin_required
+def chord_recorder_upload():
+    root = request.form.get('root', '')
+    type_name = request.form.get('type', '')
+    base = chord_file_base(root, type_name)
+    if not base:
+        return {'error': 'invalid root or type'}, 400
+    file = request.files.get('audio')
+    if not file or not file.filename:
+        return {'error': 'no audio file uploaded'}, 400
+    ext = (request.form.get('ext') or os.path.splitext(file.filename)[1].lstrip('.') or '').lower()
+    if ext not in CHORD_ALLOWED_EXTS:
+        return {'error': f'unsupported extension: {ext}'}, 400
+
+    os.makedirs(CHORD_SAMPLES_DIR, exist_ok=True)
+    remove_chord_files(base)
+    filename = f"{base}.{ext}"
+    file.save(os.path.join(CHORD_SAMPLES_DIR, filename))
+    return {'ok': True, 'url': url_for('serve_chord_sample', filename=filename)}
+
+
+@app.route('/guitar/chord-recorder/delete', methods=['POST'])
+@admin_required
+def chord_recorder_delete():
+    root = request.form.get('root', '')
+    type_name = request.form.get('type', '')
+    base = chord_file_base(root, type_name)
+    if not base:
+        return {'error': 'invalid root or type'}, 400
+    remove_chord_files(base)
+    return {'ok': True}
+
+
 if __name__ == "__main__":
     app.run(debug=True,host='0.0.0.0', port=5001)

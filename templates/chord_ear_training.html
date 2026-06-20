@@ -117,6 +117,11 @@
             <a href="{{ url_for('guitar_landing') }}" class="btn btn-outline-info mt-2">
                 <i class="bi bi-arrow-left"></i> Back to Home
             </a>
+            {% if is_admin %}
+            <a href="{{ url_for('chord_recorder') }}" class="btn btn-outline-secondary mt-2 ms-2">
+                <i class="bi bi-mic"></i> Record Chords
+            </a>
+            {% endif %}
         </div>
 
         <div class="chord-quiz-container">
@@ -250,6 +255,8 @@
             this.audioContext = null;
             this.samples = {};  // {stringFolder: {fret: AudioBuffer}}
             this.loaded = false;
+            this.savedSamples = {};  // {`${root}|${type}`: url}
+            this.savedBuffers = {};  // {url: AudioBuffer}
         }
 
         init() {
@@ -258,8 +265,28 @@
             }
         }
 
+        async loadManifest() {
+            try {
+                const res = await fetch('/guitar/chord-samples-manifest.json', { cache: 'no-store' });
+                if (res.ok) this.savedSamples = await res.json();
+            } catch (err) {
+                console.warn('chord manifest load failed', err);
+            }
+        }
+
+        async getSavedBuffer(url) {
+            if (this.savedBuffers[url]) return this.savedBuffers[url];
+            const res = await fetch(url);
+            if (!res.ok) throw new Error(`HTTP ${res.status}`);
+            const arr = await res.arrayBuffer();
+            const buf = await this.audioContext.decodeAudioData(arr);
+            this.savedBuffers[url] = buf;
+            return buf;
+        }
+
         async load() {
             this.init();
+            await this.loadManifest();
             const tasks = [];
             StringFolders.forEach(folder => {
                 this.samples[folder] = {};
@@ -291,12 +318,36 @@
             src.start(this.audioContext.currentTime + when);
         }
 
+        // Play a chord. If a recorded sample exists for (root, type), play
+        // that file directly. Otherwise fall back to per-string synthesis.
+        playChord(rootNote, typeName) {
+            this.init();
+            const key = `${rootNote}|${typeName}`;
+            const url = this.savedSamples[key];
+            if (url) {
+                this.getSavedBuffer(url).then(buf => {
+                    const src = this.audioContext.createBufferSource();
+                    src.buffer = buf;
+                    const g = this.audioContext.createGain();
+                    g.gain.setValueAtTime(0.85, this.audioContext.currentTime);
+                    src.connect(g);
+                    g.connect(this.audioContext.destination);
+                    src.start();
+                }).catch(err => {
+                    console.warn('saved chord playback failed, falling back', err);
+                    this.playSynthesizedChord(rootNote, typeName);
+                });
+                return;
+            }
+            this.playSynthesizedChord(rootNote, typeName);
+        }
+
         // Build a voicing with the root in the bass and chord tones ascending.
         // 1. Place the root on the lowest available string (low E, then A).
         // 2. For each higher string, pick the lowest fret (0-12) that lands on
         //    a chord tone — this naturally builds an ascending voicing using
         //    standard guitar pitch ordering.
-        playChord(rootNote, typeName) {
+        playSynthesizedChord(rootNote, typeName) {
             this.init();
             const rootPC = ChromaticScale.indexOf(rootNote);
             const chordPCs = new Set(Chords[typeName].intervals.map(i => (rootPC + i) % 12));
