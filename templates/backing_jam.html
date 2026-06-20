@@ -1,0 +1,314 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Backing Track Jam</title>
+    <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.2.3/dist/css/bootstrap.min.css" rel="stylesheet">
+    <link href="https://cdn.jsdelivr.net/npm/bootstrap-icons@1.10.0/font/bootstrap-icons.css" rel="stylesheet">
+    <style>
+        body { background:#f4f4f4; font-family:Arial, sans-serif; }
+        .config-row { display:flex; gap:10px; flex-wrap:wrap; align-items:center; margin-bottom:14px; }
+        .now-playing-bar {
+            display:flex; gap:8px; justify-content:center; margin:14px 0;
+        }
+        .chip {
+            padding:8px 14px; border-radius:8px; background:#e9ecef; color:#495057; font-weight:600;
+        }
+        .chip.active { background:#0d6efd; color:#fff; transform:scale(1.05); }
+        .fb-wrap { overflow-x:auto; }
+        .fb-wrap svg { display:block; margin:0 auto; cursor:pointer; }
+        .scale-status { font-size:.95rem; color:#6c757d; margin-top:8px; }
+    </style>
+</head>
+<body>
+<div class="container py-5">
+    <div class="text-center mb-4">
+        <h1 class="display-5 fw-bold">Backing Track Jam</h1>
+        <p class="text-muted">Pick a key and progression. We'll loop the chords. You solo over the highlighted scale.</p>
+        <a href="{{ url_for('guitar_landing') }}" class="btn btn-outline-primary"><i class="bi bi-arrow-left"></i> Back to Home</a>
+    </div>
+
+    <div class="card border-0 shadow-sm mb-3" style="max-width:1100px; margin:auto;">
+        <div class="card-body">
+            <div class="config-row">
+                <label><strong>Key:</strong></label>
+                <select id="key-sel" class="form-select w-auto">
+                    <option>C</option><option>D</option><option>E</option><option>F</option>
+                    <option>G</option><option>A</option><option>B</option>
+                </select>
+                <label><strong>Progression:</strong></label>
+                <select id="prog-sel" class="form-select w-auto"></select>
+                <label><strong>Scale:</strong></label>
+                <select id="scale-sel" class="form-select w-auto">
+                    <option value="Major">Major</option>
+                    <option value="MinorPentatonic">Minor Pentatonic</option>
+                    <option value="Pentatonic">Major Pentatonic</option>
+                    <option value="Blues">Blues</option>
+                    <option value="Dorian">Dorian</option>
+                    <option value="Mixolydian">Mixolydian</option>
+                </select>
+                <label><strong>Tempo:</strong></label>
+                <input type="range" id="tempo" min="50" max="160" value="80" style="width:140px;">
+                <span><span id="tempo-val">80</span> BPM</span>
+            </div>
+            <div class="text-center">
+                <button id="play-btn" class="btn btn-primary btn-lg"><i class="bi bi-play-fill"></i> Start Jam</button>
+                <button id="stop-btn" class="btn btn-outline-secondary btn-lg ms-2" disabled><i class="bi bi-stop-fill"></i> Stop</button>
+            </div>
+        </div>
+    </div>
+
+    <div class="card border-0 shadow-sm" style="max-width:1100px; margin:auto;">
+        <div class="card-body">
+            <div class="now-playing-bar" id="now-playing"></div>
+            <div id="fb-wrap" class="fb-wrap"></div>
+            <div class="scale-status text-center">
+                Click any green note to play it. Red dots = scale roots. Red highlighted dots = current chord tones.
+            </div>
+        </div>
+    </div>
+</div>
+
+<script src="{{ url_for('static', filename='js/practice.js') }}"></script>
+<script>
+const Chromatic = ['C','C#','D','D#','E','F','F#','G','G#','A','A#','B'];
+const StringFolders = ['E1','A5','D4','G3','B2','E6'];
+const StringTuning = ['E','A','D','G','B','E'];
+const StringPC = StringTuning.map(n => Chromatic.indexOf(n));
+
+const Scales = {
+    Major:           [0,2,4,5,7,9,11],
+    MinorPentatonic: [0,3,5,7,10],
+    Pentatonic:      [0,2,4,7,9],
+    Blues:           [0,3,5,6,7,10],
+    Dorian:          [0,2,3,5,7,9,10],
+    Mixolydian:      [0,2,4,5,7,9,10],
+};
+
+const MajorDiatonic = [
+    {degree:0,quality:'Major'}, {degree:2,quality:'Minor'}, {degree:4,quality:'Minor'},
+    {degree:5,quality:'Major'}, {degree:7,quality:'Major'}, {degree:9,quality:'Minor'},
+];
+const ChordIntervals = { Major:[0,4,7], Minor:[0,3,7], Diminished:[0,3,6] };
+
+const Progressions = [
+    { name:'I – V – vi – IV',  seq:[0,4,5,3] },
+    { name:'I – IV – V – I',   seq:[0,3,4,0] },
+    { name:'ii – V – I – I',   seq:[1,4,0,0] },
+    { name:'vi – IV – I – V',  seq:[5,3,0,4] },
+    { name:'I – vi – ii – V',  seq:[0,5,1,4] },
+    { name:'12-bar Blues (I-IV-I-V)', seq:[0,0,0,0,3,3,0,0,4,3,0,0] },
+];
+
+class Audio {
+    constructor() { this.ctx=null; this.samples={}; }
+    init() { if (!this.ctx) this.ctx = new (window.AudioContext||window.webkitAudioContext)(); }
+    async load() {
+        this.init();
+        const tasks = [];
+        StringFolders.forEach(f => {
+            this.samples[f] = {};
+            for (let fr=0; fr<=12; fr++) {
+                tasks.push(fetch(`/guitar-samples/${f}/${fr}.m4a`)
+                    .then(r => r.ok ? r.arrayBuffer() : null)
+                    .then(b => b ? this.ctx.decodeAudioData(b) : null)
+                    .then(a => { if (a) this.samples[f][fr] = a; }).catch(()=>{}));
+            }
+        });
+        await Promise.allSettled(tasks);
+    }
+    playOne(s, fret, when, gain=0.55) {
+        const buf = this.samples[StringFolders[s]] && this.samples[StringFolders[s]][fret];
+        if (!buf) return;
+        const src = this.ctx.createBufferSource(); src.buffer = buf;
+        const g = this.ctx.createGain(); g.gain.setValueAtTime(gain, this.ctx.currentTime + when);
+        src.connect(g); g.connect(this.ctx.destination);
+        src.start(this.ctx.currentTime + when);
+    }
+    playChord(rootNote, quality, startWhen=0, gain=0.45) {
+        this.init();
+        const rootPC = Chromatic.indexOf(rootNote);
+        const pcs = new Set(ChordIntervals[quality].map(i => (rootPC + i) % 12));
+        const picks = [];
+        for (let s=0; s<6; s++) {
+            let chosen = null;
+            if (s === 0) for (let f=0; f<=5; f++) if ((StringPC[s]+f)%12 === rootPC) { chosen=f; break; }
+            if (chosen === null) for (let f=0; f<=5; f++) if (pcs.has((StringPC[s]+f)%12)) { chosen=f; break; }
+            if (chosen === null) for (let f=6; f<=12; f++) if (pcs.has((StringPC[s]+f)%12)) { chosen=f; break; }
+            if (chosen !== null) picks.push({s, f: chosen});
+        }
+        picks.forEach((p, i) => this.playOne(p.s, p.f, startWhen + i*0.022, gain));
+    }
+}
+const audio = new Audio();
+audio.load();
+
+const state = {
+    key:'C', progIdx:0, scale:'Major', tempo:80,
+    isPlaying:false, schedulerId:null, nextBarTime:0, barIdx:0, chordSeq:[],
+    currentChordTones: new Set(),
+};
+
+function fillProgressions() {
+    const sel = document.getElementById('prog-sel');
+    Progressions.forEach((p, i) => {
+        const opt = document.createElement('option');
+        opt.value = i; opt.textContent = p.name;
+        sel.appendChild(opt);
+    });
+}
+fillProgressions();
+
+function chordsForKey(key, progIdx) {
+    const tonicPC = Chromatic.indexOf(key);
+    return Progressions[progIdx].seq.map(idx => {
+        const d = MajorDiatonic[idx];
+        return {
+            root: Chromatic[(tonicPC + d.degree) % 12],
+            quality: d.quality,
+            roman: ['I','ii','iii','IV','V','vi'][idx],
+        };
+    });
+}
+
+function renderNowPlaying(chords) {
+    const el = document.getElementById('now-playing');
+    el.innerHTML = '';
+    chords.forEach(c => {
+        const chip = document.createElement('div');
+        chip.className = 'chip';
+        chip.textContent = `${c.root}${c.quality === 'Minor' ? 'm' : ''}`;
+        el.appendChild(chip);
+    });
+}
+
+function setActiveChip(idx) {
+    document.querySelectorAll('#now-playing .chip').forEach((c, i) => c.classList.toggle('active', i === idx));
+}
+
+function renderFretboard() {
+    const rootPC = Chromatic.indexOf(state.key);
+    const intervals = Scales[state.scale];
+    const scalePCs = new Set(intervals.map(i => (rootPC + i) % 12));
+    const FRETS = 14;
+    const stringSpacing = 28;
+    const fretSpacing = 50;
+    const startX = 40;
+    const startY = 25;
+    const W = startX + FRETS * fretSpacing + 20;
+    const H = startY + 5 * stringSpacing + 40;
+
+    let svg = `<svg width="${W}" height="${H}" xmlns="http://www.w3.org/2000/svg">`;
+    svg += `<rect x="${startX}" y="${startY}" width="${FRETS * fretSpacing}" height="${5 * stringSpacing}" fill="#f4e4d0"/>`;
+    svg += `<rect x="${startX-4}" y="${startY}" width="6" height="${5*stringSpacing}" fill="#222"/>`;
+    for (let f=0; f<=FRETS; f++) {
+        const x = startX + f * fretSpacing;
+        svg += `<line x1="${x}" y1="${startY}" x2="${x}" y2="${startY + 5*stringSpacing}" stroke="#888" stroke-width="1.5"/>`;
+    }
+    [3,5,7,9,12].forEach(f => {
+        if (f > FRETS) return;
+        const cx = startX + (f - 0.5) * fretSpacing;
+        if (f === 12) {
+            svg += `<circle cx="${cx}" cy="${startY + 1.5*stringSpacing}" r="5" fill="#d4b896"/>`;
+            svg += `<circle cx="${cx}" cy="${startY + 3.5*stringSpacing}" r="5" fill="#d4b896"/>`;
+        } else {
+            svg += `<circle cx="${cx}" cy="${startY + 2.5*stringSpacing}" r="5" fill="#d4b896"/>`;
+        }
+    });
+    for (let s=0; s<6; s++) {
+        const y = startY + s*stringSpacing;
+        svg += `<line x1="${startX}" y1="${y}" x2="${startX + FRETS*fretSpacing}" y2="${y}" stroke="#333" stroke-width="${1 + (5-s)*0.3}"/>`;
+        svg += `<text x="${startX-12}" y="${y+4}" text-anchor="end" font-size="11" fill="#666">${StringTuning[s]}</text>`;
+    }
+    for (let f=1; f<=FRETS; f++) {
+        const x = startX + (f - 0.5) * fretSpacing;
+        svg += `<text x="${x}" y="${startY + 5*stringSpacing + 18}" text-anchor="middle" font-size="11" fill="#555">${f}</text>`;
+    }
+    // Note dots
+    for (let s=0; s<6; s++) {
+        for (let f=0; f<=FRETS; f++) {
+            const pc = (StringPC[s] + f) % 12;
+            if (!scalePCs.has(pc)) continue;
+            const cx = f === 0 ? startX - 14 : startX + (f - 0.5) * fretSpacing;
+            const cy = startY + s*stringSpacing;
+            const isRoot = pc === rootPC;
+            const inChord = state.currentChordTones.has(pc);
+            let fill = isRoot ? '#dc2626' : '#16a34a';
+            if (inChord) fill = isRoot ? '#7c2d12' : '#0d6efd';
+            svg += `<circle data-s="${s}" data-f="${f}" cx="${cx}" cy="${cy}" r="10" fill="${fill}" stroke="#fff" stroke-width="1.5" class="hot"/>`;
+            svg += `<text x="${cx}" y="${cy+3}" text-anchor="middle" font-size="9" fill="#fff" font-weight="bold" pointer-events="none">${Chromatic[pc]}</text>`;
+        }
+    }
+    svg += `</svg>`;
+    document.getElementById('fb-wrap').innerHTML = svg;
+
+    document.querySelectorAll('#fb-wrap .hot').forEach(el => {
+        el.addEventListener('click', () => {
+            audio.init();
+            audio.playOne(Number(el.dataset.s), Number(el.dataset.f), 0, 0.6);
+        });
+    });
+}
+
+function start() {
+    if (state.isPlaying) return;
+    audio.init();
+    state.chordSeq = chordsForKey(state.key, state.progIdx);
+    renderNowPlaying(state.chordSeq);
+    state.isPlaying = true;
+    state.barIdx = 0;
+    state.nextBarTime = audio.ctx.currentTime + 0.2;
+    document.getElementById('play-btn').disabled = true;
+    document.getElementById('stop-btn').disabled = false;
+    state.schedulerId = setInterval(scheduler, 50);
+}
+
+function stop() {
+    state.isPlaying = false;
+    clearInterval(state.schedulerId);
+    state.schedulerId = null;
+    state.currentChordTones = new Set();
+    setActiveChip(-1);
+    renderFretboard();
+    document.getElementById('play-btn').disabled = false;
+    document.getElementById('stop-btn').disabled = true;
+    if (window.GuitarPractice) GuitarPractice.record('backing-jam', 15);
+}
+
+function scheduler() {
+    if (!state.isPlaying) return;
+    const ctx = audio.ctx;
+    const barSec = 4 * 60 / state.tempo;
+    while (state.nextBarTime < ctx.currentTime + 0.2) {
+        const idx = state.barIdx % state.chordSeq.length;
+        const chord = state.chordSeq[idx];
+        audio.playChord(chord.root, chord.quality, state.nextBarTime - ctx.currentTime, 0.4);
+        // Strum again on beat 3 for groove.
+        audio.playChord(chord.root, chord.quality, state.nextBarTime - ctx.currentTime + barSec/2, 0.3);
+        const flashAt = (state.nextBarTime - ctx.currentTime) * 1000;
+        setTimeout(() => {
+            setActiveChip(idx);
+            const rootPC = Chromatic.indexOf(chord.root);
+            state.currentChordTones = new Set(ChordIntervals[chord.quality].map(i => (rootPC + i) % 12));
+            renderFretboard();
+        }, Math.max(0, flashAt));
+        state.barIdx++;
+        state.nextBarTime += barSec;
+    }
+}
+
+document.getElementById('key-sel').addEventListener('change', (e) => { state.key = e.target.value; renderFretboard(); });
+document.getElementById('prog-sel').addEventListener('change', (e) => { state.progIdx = Number(e.target.value); });
+document.getElementById('scale-sel').addEventListener('change', (e) => { state.scale = e.target.value; renderFretboard(); });
+document.getElementById('tempo').addEventListener('input', (e) => {
+    state.tempo = Number(e.target.value);
+    document.getElementById('tempo-val').textContent = state.tempo;
+});
+document.getElementById('play-btn').addEventListener('click', start);
+document.getElementById('stop-btn').addEventListener('click', stop);
+
+renderFretboard();
+</script>
+</body>
+</html>

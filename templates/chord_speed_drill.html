@@ -1,0 +1,247 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Chord Speed Drill</title>
+    <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.2.3/dist/css/bootstrap.min.css" rel="stylesheet">
+    <link href="https://cdn.jsdelivr.net/npm/bootstrap-icons@1.10.0/font/bootstrap-icons.css" rel="stylesheet">
+    <style>
+        body { background:#f4f4f4; font-family:Arial, sans-serif; }
+        .chord-display {
+            background:#fff; border-radius:18px; padding:50px 30px; text-align:center;
+            box-shadow: 0 4px 20px rgba(0,0,0,.06);
+        }
+        .chord-name {
+            font-size:7rem; font-weight:700; color:#0d6efd; line-height:1;
+        }
+        .next-chord {
+            font-size:1.4rem; color:#6c757d; margin-top:14px;
+        }
+        .stat-row { display:flex; justify-content:space-around; margin-top:20px; flex-wrap:wrap; gap:10px; }
+        .stat-card {
+            flex:1 1 140px; padding:14px; background:#fff; border-radius:10px; text-align:center;
+            border:1px solid #e9ecef;
+        }
+        .stat-num { font-size:1.8rem; font-weight:700; color:#0d6efd; }
+        .stat-label { color:#6c757d; font-size:.85rem; }
+        .timer-bar {
+            height:8px; background:#e9ecef; border-radius:4px; overflow:hidden; margin:20px 10px 0;
+        }
+        .timer-bar .fill { height:100%; background:#198754; transition:width .05s linear; }
+        .timer-bar.late .fill { background:#dc3545; }
+        .level-card { cursor:pointer; transition:.2s; }
+        .level-card:hover { transform:translateY(-3px); box-shadow:0 6px 14px rgba(0,0,0,.1);}
+        .level-card.selected { border:2px solid #0d6efd; }
+    </style>
+</head>
+<body>
+<div class="container py-5">
+    <div class="text-center mb-4">
+        <h1 class="display-5 fw-bold">Chord Speed Drill</h1>
+        <p class="text-muted">A chord flashes. Play it. Tap when you nail the change. Track your CPM.</p>
+        <a href="{{ url_for('guitar_landing') }}" class="btn btn-outline-primary"><i class="bi bi-arrow-left"></i> Back to Home</a>
+    </div>
+
+    <div id="setup" class="row g-3 justify-content-center" style="max-width:900px; margin:auto;">
+        <div class="col-md-4"><div class="card level-card border-0 shadow-sm h-100" data-level="open">
+            <div class="card-body text-center">
+                <i class="bi bi-1-circle-fill text-success display-5"></i>
+                <h4>Open Chords</h4>
+                <p class="small text-muted">C, G, D, Em, Am, A, E, Dm, F</p>
+            </div></div></div>
+        <div class="col-md-4"><div class="card level-card border-0 shadow-sm h-100" data-level="barre">
+            <div class="card-body text-center">
+                <i class="bi bi-2-circle-fill text-warning display-5"></i>
+                <h4>Add Barre Chords</h4>
+                <p class="small text-muted">Open chords + Bm, F#m, Bb, F#</p>
+            </div></div></div>
+        <div class="col-md-4"><div class="card level-card border-0 shadow-sm h-100" data-level="seventh">
+            <div class="card-body text-center">
+                <i class="bi bi-3-circle-fill text-danger display-5"></i>
+                <h4>Add 7th Chords</h4>
+                <p class="small text-muted">All above + Cmaj7, Am7, D7, G7, E7, Dm7</p>
+            </div></div></div>
+        <div class="col-12 text-center mt-3">
+            <label class="me-2">Time per chord:</label>
+            <select id="time-sel" class="form-select d-inline-block w-auto">
+                <option value="4">4 seconds (relaxed)</option>
+                <option value="3" selected>3 seconds (standard)</option>
+                <option value="2">2 seconds (fast)</option>
+                <option value="1.5">1.5 seconds (lightning)</option>
+            </select>
+            <label class="ms-3 me-2">Drill length:</label>
+            <select id="dur-sel" class="form-select d-inline-block w-auto">
+                <option value="60" selected>1 minute</option>
+                <option value="120">2 minutes</option>
+                <option value="180">3 minutes</option>
+            </select>
+            <br>
+            <button id="start-btn" class="btn btn-primary btn-lg mt-3" disabled>Start Drill</button>
+        </div>
+    </div>
+
+    <div id="play" style="display:none; max-width:600px; margin:auto;">
+        <div class="chord-display">
+            <div id="current-chord" class="chord-name">—</div>
+            <div id="next-chord" class="next-chord">Next: —</div>
+            <div class="timer-bar"><div id="timer-fill" class="fill" style="width:100%;"></div></div>
+        </div>
+        <div class="stat-row">
+            <div class="stat-card"><div id="hit-count" class="stat-num">0</div><div class="stat-label">Hits</div></div>
+            <div class="stat-card"><div id="miss-count" class="stat-num">0</div><div class="stat-label">Misses</div></div>
+            <div class="stat-card"><div id="cpm" class="stat-num">0</div><div class="stat-label">Chords/min</div></div>
+            <div class="stat-card"><div id="time-left" class="stat-num">60</div><div class="stat-label">Seconds Left</div></div>
+        </div>
+        <div class="text-center mt-3">
+            <button id="hit-btn" class="btn btn-success btn-lg"><i class="bi bi-check-lg"></i> Got It (Space)</button>
+            <button id="end-btn" class="btn btn-outline-secondary ms-2"><i class="bi bi-stop-fill"></i> End Drill</button>
+        </div>
+    </div>
+
+    <div id="results" style="display:none; max-width:600px; margin:auto;">
+        <div class="card border-0 shadow-sm"><div class="card-body text-center">
+            <h3>Drill Complete</h3>
+            <div class="stat-row">
+                <div class="stat-card"><div id="r-hits" class="stat-num">0</div><div class="stat-label">Hits</div></div>
+                <div class="stat-card"><div id="r-misses" class="stat-num">0</div><div class="stat-label">Misses</div></div>
+                <div class="stat-card"><div id="r-cpm" class="stat-num">0</div><div class="stat-label">CPM</div></div>
+                <div class="stat-card"><div id="r-acc" class="stat-num">0%</div><div class="stat-label">Accuracy</div></div>
+            </div>
+            <p id="r-msg" class="text-muted mt-3"></p>
+            <button id="again-btn" class="btn btn-primary mt-3"><i class="bi bi-arrow-counterclockwise"></i> Run Again</button>
+        </div></div>
+    </div>
+</div>
+
+<script src="{{ url_for('static', filename='js/practice.js') }}"></script>
+<script>
+const ChordPools = {
+    open:    ['C','G','D','Em','Am','A','E','Dm','F'],
+    barre:   ['C','G','D','Em','Am','A','E','Dm','F','Bm','F#m','Bb','F#','C#m','B'],
+    seventh: ['C','G','D','Em','Am','A','E','Dm','F','Bm','F#m','Bb','F#','C#m','B','Cmaj7','Am7','D7','G7','E7','Dm7','Em7'],
+};
+
+const state = {
+    level: null,
+    timePerChord: 3,
+    duration: 60,
+    isRunning: false,
+    chord: null, next: null,
+    chordStart: 0,
+    hits: 0, misses: 0,
+    drillStart: 0,
+    timerInterval: null,
+};
+
+document.querySelectorAll('.level-card').forEach(c => {
+    c.addEventListener('click', () => {
+        document.querySelectorAll('.level-card').forEach(x => x.classList.remove('selected'));
+        c.classList.add('selected');
+        state.level = c.dataset.level;
+        document.getElementById('start-btn').disabled = false;
+    });
+});
+
+document.getElementById('start-btn').addEventListener('click', () => {
+    state.timePerChord = parseFloat(document.getElementById('time-sel').value);
+    state.duration = parseInt(document.getElementById('dur-sel').value);
+    state.hits = 0; state.misses = 0;
+    state.isRunning = true;
+    state.drillStart = performance.now();
+    document.getElementById('setup').style.display = 'none';
+    document.getElementById('results').style.display = 'none';
+    document.getElementById('play').style.display = 'block';
+    pickChord();
+    state.timerInterval = setInterval(tick, 50);
+});
+
+document.getElementById('hit-btn').addEventListener('click', recordHit);
+window.addEventListener('keydown', (e) => {
+    if (e.code === 'Space' && state.isRunning) {
+        e.preventDefault();
+        recordHit();
+    }
+});
+document.getElementById('end-btn').addEventListener('click', endDrill);
+document.getElementById('again-btn').addEventListener('click', () => {
+    document.getElementById('results').style.display = 'none';
+    document.getElementById('setup').style.display = 'flex';
+});
+
+function pickChord() {
+    const pool = ChordPools[state.level];
+    const next = pool[Math.floor(Math.random() * pool.length)];
+    if (state.chord === null) {
+        state.chord = pool[Math.floor(Math.random() * pool.length)];
+        state.next = pool[Math.floor(Math.random() * pool.length)];
+        while (state.next === state.chord) state.next = pool[Math.floor(Math.random() * pool.length)];
+    } else {
+        state.chord = state.next;
+        let n = pool[Math.floor(Math.random() * pool.length)];
+        while (n === state.chord) n = pool[Math.floor(Math.random() * pool.length)];
+        state.next = n;
+    }
+    state.chordStart = performance.now();
+    document.getElementById('current-chord').textContent = state.chord;
+    document.getElementById('next-chord').textContent = `Next: ${state.next}`;
+}
+
+function recordHit() {
+    if (!state.isRunning) return;
+    const elapsed = (performance.now() - state.chordStart) / 1000;
+    if (elapsed <= state.timePerChord) {
+        state.hits++;
+    } else {
+        state.misses++;
+    }
+    document.getElementById('hit-count').textContent = state.hits;
+    document.getElementById('miss-count').textContent = state.misses;
+    pickChord();
+}
+
+function tick() {
+    if (!state.isRunning) return;
+    const now = performance.now();
+    const elapsed = (now - state.chordStart) / 1000;
+    const drillElapsed = (now - state.drillStart) / 1000;
+    const left = state.duration - drillElapsed;
+    if (left <= 0) { endDrill(); return; }
+    document.getElementById('time-left').textContent = Math.ceil(left);
+    const pct = Math.max(0, 100 - (elapsed / state.timePerChord) * 100);
+    document.getElementById('timer-fill').style.width = pct + '%';
+    document.querySelector('.timer-bar').classList.toggle('late', elapsed > state.timePerChord);
+    if (elapsed > state.timePerChord + 0.4) {
+        // Auto-skip on big overshoot.
+        state.misses++;
+        document.getElementById('miss-count').textContent = state.misses;
+        pickChord();
+    }
+    const minutes = drillElapsed / 60;
+    if (minutes > 0) {
+        document.getElementById('cpm').textContent = Math.round((state.hits + state.misses) / minutes);
+    }
+}
+
+function endDrill() {
+    state.isRunning = false;
+    clearInterval(state.timerInterval);
+    document.getElementById('play').style.display = 'none';
+    document.getElementById('results').style.display = 'block';
+    const total = state.hits + state.misses;
+    const minutes = (performance.now() - state.drillStart) / 60000;
+    const cpm = minutes > 0 ? Math.round(total / minutes) : 0;
+    const acc = total > 0 ? Math.round(state.hits / total * 100) : 0;
+    document.getElementById('r-hits').textContent = state.hits;
+    document.getElementById('r-misses').textContent = state.misses;
+    document.getElementById('r-cpm').textContent = cpm;
+    document.getElementById('r-acc').textContent = acc + '%';
+    document.getElementById('r-msg').textContent =
+        cpm >= 50 ? 'Lightning quick. Clean changes are within reach.' :
+        cpm >= 30 ? 'Solid speed. Keep your fingers low to the strings between changes.' :
+                    'Build it slowly. Speed comes from accurate finger placement, not effort.';
+    if (window.GuitarPractice) GuitarPractice.record('chord-speed-drill', Math.min(50, state.hits * 2));
+}
+</script>
+</body>
+</html>

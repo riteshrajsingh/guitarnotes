@@ -1,0 +1,274 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Chord Progression Trainer</title>
+    <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.2.3/dist/css/bootstrap.min.css" rel="stylesheet">
+    <link href="https://cdn.jsdelivr.net/npm/bootstrap-icons@1.10.0/font/bootstrap-icons.css" rel="stylesheet">
+    <style>
+        body { background:#f4f4f4; font-family:Arial, sans-serif; }
+        .opt-btn { min-width:200px; margin:6px; }
+        .opt-btn.correct { background:#198754!important; color:#fff!important; border-color:#198754!important; }
+        .opt-btn.incorrect { background:#dc3545!important; color:#fff!important; border-color:#dc3545!important; }
+        .feedback { min-height:30px; font-weight:500; }
+        .feedback.right { color:#198754; } .feedback.wrong { color:#dc3545; }
+        .quiz-status { display:flex; justify-content:space-between; padding:10px 18px;
+            background:#fff; border:1px solid #dee2e6; border-radius:8px; margin-bottom:18px;}
+        .question-box { background:#fff; padding:24px; border-radius:12px; text-align:center; }
+        .now-playing { display:flex; justify-content:center; gap:8px; margin-top:14px; }
+        .now-playing .chip {
+            padding:8px 14px; border-radius:8px; background:#e9ecef; color:#495057; font-weight:600;
+            transition:all .2s;
+        }
+        .now-playing .chip.active { background:#0d6efd; color:#fff; transform:scale(1.08); }
+    </style>
+</head>
+<body>
+<div class="container py-5">
+    <div class="text-center mb-4">
+        <h1 class="display-5 fw-bold">Chord Progression Trainer</h1>
+        <p class="text-muted">Hear a 4-chord progression. Identify it by Roman numerals.</p>
+        <a href="{{ url_for('guitar_landing') }}" class="btn btn-outline-primary"><i class="bi bi-arrow-left"></i> Back to Home</a>
+    </div>
+
+    <div id="quiz-screen" style="max-width:900px; margin:auto;">
+        <div class="quiz-status">
+            <span>Question <strong id="qn">1</strong>/<strong id="qt">10</strong></span>
+            <span>Score: <strong id="qscore">0</strong></span>
+        </div>
+        <div class="question-box">
+            <button id="play-btn" class="btn btn-primary btn-lg"><i class="bi bi-play-fill"></i> Play Progression</button>
+            <button id="replay-btn" class="btn btn-info btn-lg ms-2" disabled><i class="bi bi-arrow-repeat"></i> Replay</button>
+            <div class="now-playing" id="now-playing"></div>
+            <div class="feedback mt-3" id="feedback"></div>
+            <div id="opts" class="mt-2 d-flex flex-wrap justify-content-center"></div>
+            <button id="next-btn" class="btn btn-success mt-3" style="display:none;">Next <i class="bi bi-arrow-right"></i></button>
+        </div>
+    </div>
+
+    <div id="results-screen" style="display:none; max-width:700px; margin:auto;">
+        <div class="card border-0 shadow-sm"><div class="card-body text-center">
+            <h3>Quiz Complete</h3>
+            <div style="font-size:3rem; font-weight:700; color:#0d6efd;"><span id="final-score">0</span>/10</div>
+            <p id="result-msg" class="text-muted"></p>
+            <button id="again-btn" class="btn btn-primary mt-3"><i class="bi bi-arrow-counterclockwise"></i> Play Again</button>
+        </div></div>
+    </div>
+</div>
+
+<script src="{{ url_for('static', filename='js/practice.js') }}"></script>
+<script>
+const Chromatic = ['C','C#','D','D#','E','F','F#','G','G#','A','A#','B'];
+const StringFolders = ['E1','A5','D4','G3','B2','E6'];
+const StringTuning = ['E','A','D','G','B','E'];
+const StringPC = StringTuning.map(n => Chromatic.indexOf(n));
+
+// Diatonic chord-quality table for the major scale.
+const MajorDiatonic = [
+    { roman:'I',   degree:0, quality:'Major' },
+    { roman:'ii',  degree:2, quality:'Minor' },
+    { roman:'iii', degree:4, quality:'Minor' },
+    { roman:'IV',  degree:5, quality:'Major' },
+    { roman:'V',   degree:7, quality:'Major' },
+    { roman:'vi',  degree:9, quality:'Minor' },
+    { roman:'vii°',degree:11,quality:'Diminished' },
+];
+const ChordIntervals = {
+    Major:      [0,4,7],
+    Minor:      [0,3,7],
+    Diminished: [0,3,6],
+};
+
+// Common progressions (by Roman numeral indices into MajorDiatonic).
+// 0=I, 1=ii, 2=iii, 3=IV, 4=V, 5=vi, 6=vii°
+const Progressions = [
+    { name:'I – IV – V – I',    seq:[0,3,4,0] },
+    { name:'I – V – vi – IV',   seq:[0,4,5,3] },
+    { name:'ii – V – I – I',    seq:[1,4,0,0] },
+    { name:'vi – IV – I – V',   seq:[5,3,0,4] },
+    { name:'I – vi – IV – V',   seq:[0,5,3,4] },
+    { name:'I – IV – vi – V',   seq:[0,3,5,4] },
+    { name:'I – iii – IV – V',  seq:[0,2,3,4] },
+    { name:'I – V – IV – V',    seq:[0,4,3,4] },
+];
+const TOTAL = 10;
+const RootKeys = ['C','D','E','F','G','A'];
+
+class Audio {
+    constructor() { this.ctx=null; this.samples={}; }
+    init() { if (!this.ctx) this.ctx = new (window.AudioContext||window.webkitAudioContext)(); }
+    async load() {
+        this.init();
+        const tasks = [];
+        StringFolders.forEach(f => {
+            this.samples[f] = {};
+            for (let fr=0; fr<=12; fr++) {
+                tasks.push(fetch(`/guitar-samples/${f}/${fr}.m4a`)
+                    .then(r => r.ok ? r.arrayBuffer() : null)
+                    .then(b => b ? this.ctx.decodeAudioData(b) : null)
+                    .then(a => { if (a) this.samples[f][fr] = a; }).catch(()=>{}));
+            }
+        });
+        await Promise.allSettled(tasks);
+    }
+    playOne(s, fret, when, gain=0.55) {
+        const buf = this.samples[StringFolders[s]] && this.samples[StringFolders[s]][fret];
+        if (!buf) return;
+        const src = this.ctx.createBufferSource(); src.buffer = buf;
+        const g = this.ctx.createGain(); g.gain.setValueAtTime(gain, this.ctx.currentTime + when);
+        src.connect(g); g.connect(this.ctx.destination);
+        src.start(this.ctx.currentTime + when);
+    }
+    playChord(rootNote, quality, startWhen=0) {
+        this.init();
+        const rootPC = Chromatic.indexOf(rootNote);
+        const pcs = new Set(ChordIntervals[quality].map(i => (rootPC + i) % 12));
+        const picks = [];
+        for (let s = 0; s < 6; s++) {
+            let chosen = null;
+            if (s === 0) {
+                for (let f = 0; f <= 5; f++) if ((StringPC[s]+f)%12 === rootPC) { chosen=f; break; }
+            }
+            if (chosen === null) {
+                for (let f = 0; f <= 5; f++) if (pcs.has((StringPC[s]+f)%12)) { chosen=f; break; }
+            }
+            if (chosen === null) {
+                for (let f = 6; f <= 12; f++) if (pcs.has((StringPC[s]+f)%12)) { chosen=f; break; }
+            }
+            if (chosen !== null) picks.push({s, f: chosen});
+        }
+        const strumGap = 0.022;
+        picks.forEach((p, i) => this.playOne(p.s, p.f, startWhen + i*strumGap));
+    }
+}
+
+const audio = new Audio();
+audio.load();
+
+const state = { qs: [], i: 0, score: 0, answered: false };
+
+function genQuestions() {
+    const out = [];
+    for (let i = 0; i < TOTAL; i++) {
+        const key = RootKeys[Math.floor(Math.random() * RootKeys.length)];
+        const prog = Progressions[Math.floor(Math.random() * Progressions.length)];
+        // Build options: correct + 3-4 distractor progressions.
+        const opts = new Set([prog]);
+        while (opts.size < 5) {
+            opts.add(Progressions[Math.floor(Math.random() * Progressions.length)]);
+        }
+        const arr = Array.from(opts);
+        for (let j = arr.length - 1; j > 0; j--) {
+            const k = Math.floor(Math.random() * (j+1));
+            [arr[j], arr[k]] = [arr[k], arr[j]];
+        }
+        out.push({ key, prog, options: arr });
+    }
+    return out;
+}
+
+function chordsForProg(key, prog) {
+    const keyPC = Chromatic.indexOf(key);
+    return prog.seq.map(idx => {
+        const d = MajorDiatonic[idx];
+        return {
+            root: Chromatic[(keyPC + d.degree) % 12],
+            quality: d.quality,
+            roman: d.roman,
+        };
+    });
+}
+
+function play(q) {
+    const chords = chordsForProg(q.key, q.prog);
+    const beat = 1.05;
+    const npEl = document.getElementById('now-playing');
+    npEl.innerHTML = '';
+    chords.forEach((c, i) => {
+        const chip = document.createElement('div');
+        chip.className = 'chip';
+        chip.textContent = `${c.root}${c.quality === 'Minor' ? 'm' : c.quality === 'Diminished' ? 'dim' : ''}`;
+        npEl.appendChild(chip);
+        audio.playChord(c.root, c.quality, i * beat);
+        setTimeout(() => {
+            npEl.querySelectorAll('.chip').forEach(x => x.classList.remove('active'));
+            chip.classList.add('active');
+        }, i * beat * 1000);
+    });
+}
+
+document.getElementById('play-btn').addEventListener('click', () => { play(state.qs[state.i]); document.getElementById('replay-btn').disabled = false; });
+document.getElementById('replay-btn').addEventListener('click', () => play(state.qs[state.i]));
+document.getElementById('next-btn').addEventListener('click', () => {
+    state.i++;
+    if (state.i >= TOTAL) showResults();
+    else renderQ();
+});
+document.getElementById('again-btn').addEventListener('click', () => {
+    state.i = 0; state.score = 0;
+    state.qs = genQuestions();
+    document.getElementById('results-screen').style.display = 'none';
+    document.getElementById('quiz-screen').style.display = 'block';
+    renderQ();
+});
+
+function renderQ() {
+    const q = state.qs[state.i];
+    state.answered = false;
+    document.getElementById('qn').textContent = state.i + 1;
+    document.getElementById('qt').textContent = TOTAL;
+    document.getElementById('qscore').textContent = state.score;
+    document.getElementById('feedback').textContent = '';
+    document.getElementById('feedback').className = 'feedback';
+    document.getElementById('next-btn').style.display = 'none';
+    const optsEl = document.getElementById('opts');
+    optsEl.innerHTML = '';
+    q.options.forEach(opt => {
+        const b = document.createElement('button');
+        b.className = 'btn btn-outline-primary opt-btn';
+        b.textContent = opt.name;
+        b.addEventListener('click', () => {
+            if (state.answered) return;
+            state.answered = true;
+            Array.from(optsEl.children).forEach(c => {
+                c.style.pointerEvents = 'none';
+                if (c.textContent === q.prog.name) c.classList.add('correct');
+            });
+            const correct = opt === q.prog;
+            if (correct) {
+                state.score++;
+                document.getElementById('feedback').textContent = `Correct — ${q.prog.name} in the key of ${q.key}.`;
+                document.getElementById('feedback').className = 'feedback right';
+                if (window.GuitarPractice) GuitarPractice.record('progression-trainer', 10);
+            } else {
+                b.classList.add('incorrect');
+                document.getElementById('feedback').textContent = `It was ${q.prog.name} in ${q.key}.`;
+                document.getElementById('feedback').className = 'feedback wrong';
+            }
+            document.getElementById('qscore').textContent = state.score;
+            document.getElementById('next-btn').textContent = state.i + 1 >= TOTAL ? 'See Results' : 'Next';
+            document.getElementById('next-btn').style.display = 'inline-block';
+        });
+        optsEl.appendChild(b);
+    });
+    document.getElementById('replay-btn').disabled = true;
+    setTimeout(() => { play(q); document.getElementById('replay-btn').disabled = false; }, 250);
+}
+
+function showResults() {
+    document.getElementById('quiz-screen').style.display = 'none';
+    document.getElementById('results-screen').style.display = 'block';
+    document.getElementById('final-score').textContent = state.score;
+    const pct = Math.round((state.score/TOTAL)*100);
+    document.getElementById('result-msg').textContent = pct === 100
+        ? 'Perfect ear for progressions.'
+        : pct >= 70 ? `${pct}% — strong.`
+        : `${pct}% — listen for the bass movement; that's the giveaway.`;
+}
+
+state.qs = genQuestions();
+renderQ();
+</script>
+</body>
+</html>

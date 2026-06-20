@@ -176,6 +176,28 @@
         background-color: rgba(0,0,255,0.7);
         border-color: darkblue;
     }
+
+    /* Mobile: shrink fretboard so it fits common phone widths
+       without horizontal scroll. */
+    @media (max-width: 768px) {
+        .full-guitar-string { height: 42px; }
+        .full-note-marker {
+            width: 32px; height: 32px;
+            top: 5px;
+            font-size: 12px; border-width: 1.5px;
+        }
+        .fret-number { font-size: 11px; }
+    }
+    @media (max-width: 480px) {
+        #fretboard-container { padding: 0 4px; }
+        .full-guitar-string { height: 32px; }
+        .full-note-marker {
+            width: 24px; height: 24px;
+            top: 4px;
+            font-size: 10px; border-width: 1px;
+        }
+        .fret-number { font-size: 9px; }
+    }
 </style>
 
 </head>

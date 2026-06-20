@@ -1,0 +1,186 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Practice Streak</title>
+    <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.2.3/dist/css/bootstrap.min.css" rel="stylesheet">
+    <link href="https://cdn.jsdelivr.net/npm/bootstrap-icons@1.10.0/font/bootstrap-icons.css" rel="stylesheet">
+    <style>
+        body { background:#f4f4f4; font-family:Arial, sans-serif; }
+        .stat-card {
+            background:#fff; border-radius:14px; padding:24px; text-align:center;
+            box-shadow:0 2px 10px rgba(0,0,0,.04); height:100%;
+        }
+        .stat-num { font-size:2.6rem; font-weight:700; color:#0d6efd; }
+        .stat-label { color:#6c757d; }
+        .level-bar {
+            height:14px; background:#e9ecef; border-radius:7px; overflow:hidden;
+        }
+        .level-bar .fill { height:100%; background:linear-gradient(90deg, #0d6efd, #6610f2); transition:width .4s; }
+        .calendar {
+            display:grid; grid-template-columns: repeat(14, 1fr); gap:4px; padding:14px;
+            background:#fff; border-radius:14px; box-shadow:0 2px 10px rgba(0,0,0,.04);
+        }
+        .day-cell {
+            aspect-ratio:1/1; border-radius:4px; background:#e9ecef;
+            position:relative;
+        }
+        .day-cell[data-xp] { background:#cfe2ff; }
+        .day-cell.heat-1 { background:#9ec5fe; }
+        .day-cell.heat-2 { background:#6ea8fe; }
+        .day-cell.heat-3 { background:#0d6efd; }
+        .day-cell.heat-4 { background:#0a58ca; }
+        .day-cell.today { outline:2px solid #198754; }
+        .day-tooltip {
+            position:absolute; bottom:110%; left:50%; transform:translateX(-50%);
+            background:#212529; color:#fff; padding:4px 8px; border-radius:4px; font-size:.75rem;
+            display:none; white-space:nowrap; z-index:5;
+        }
+        .day-cell:hover .day-tooltip { display:block; }
+        .feature-row { padding:10px 4px; border-bottom:1px solid #f0f0f0; display:flex; justify-content:space-between; }
+        .feature-row:last-child { border:none; }
+    </style>
+</head>
+<body>
+<div class="container py-5">
+    <div class="text-center mb-4">
+        <h1 class="display-5 fw-bold">Practice Streak</h1>
+        <p class="text-muted">Track your daily practice across every feature.</p>
+        <a href="{{ url_for('guitar_landing') }}" class="btn btn-outline-primary"><i class="bi bi-arrow-left"></i> Back to Home</a>
+    </div>
+
+    <div class="row g-3 mb-4" style="max-width:1100px; margin:auto;">
+        <div class="col-md-3"><div class="stat-card"><div id="streak-num" class="stat-num">0</div><div class="stat-label">Day Streak</div></div></div>
+        <div class="col-md-3"><div class="stat-card"><div id="xp-num" class="stat-num">0</div><div class="stat-label">Total XP</div></div></div>
+        <div class="col-md-3"><div class="stat-card"><div id="level-num" class="stat-num">1</div><div class="stat-label">Level</div></div></div>
+        <div class="col-md-3"><div class="stat-card"><div id="today-num" class="stat-num">0</div><div class="stat-label">XP Today</div></div></div>
+    </div>
+
+    <div class="card border-0 shadow-sm mb-4" style="max-width:1100px; margin:auto;">
+        <div class="card-body">
+            <div class="d-flex justify-content-between align-items-center mb-2">
+                <strong id="level-name">Open Chord Apprentice</strong>
+                <span id="level-progress-text" class="text-muted small">— XP to next level</span>
+            </div>
+            <div class="level-bar"><div id="level-fill" class="fill" style="width:0%;"></div></div>
+        </div>
+    </div>
+
+    <div style="max-width:1100px; margin:auto;">
+        <h5 class="text-muted mb-3">Last 8 Weeks</h5>
+        <div id="calendar" class="calendar mb-4"></div>
+    </div>
+
+    <div class="card border-0 shadow-sm" style="max-width:1100px; margin:auto;">
+        <div class="card-body">
+            <h5 class="text-muted mb-3">XP by Feature</h5>
+            <div id="feature-list"></div>
+        </div>
+    </div>
+
+    <div class="text-center mt-4">
+        <button id="reset-btn" class="btn btn-outline-danger btn-sm"><i class="bi bi-trash"></i> Reset all practice data</button>
+    </div>
+</div>
+
+<script src="{{ url_for('static', filename='js/practice.js') }}"></script>
+<script>
+const FeatureNames = {
+    'fretboard-trainer': 'Fretboard Note Trainer',
+    'interval-trainer': 'Interval Ear Training',
+    'progression-trainer': 'Chord Progression Trainer',
+    'find-the-key': 'Find the Key',
+    'tuner': 'Tuner',
+    'strum-trainer': 'Strum Pattern Trainer',
+    'chord-speed-drill': 'Chord Speed Drill',
+    'backing-jam': 'Backing Track Jam',
+    'tab-reader': 'Tab Reader',
+    'chord-ear-training': 'Chord Ear Training',
+};
+
+function dayKey(d) {
+    const m = String(d.getMonth()+1).padStart(2,'0');
+    const dd = String(d.getDate()).padStart(2,'0');
+    return `${d.getFullYear()}-${m}-${dd}`;
+}
+
+function render() {
+    const data = GuitarPractice.get();
+    const totalXp = data.totalXp || 0;
+    const today = GuitarPractice.todayKey();
+    const todayXp = data.days[today] ? data.days[today].totalXp : 0;
+    document.getElementById('xp-num').textContent = totalXp;
+    document.getElementById('today-num').textContent = todayXp;
+    document.getElementById('streak-num').textContent = GuitarPractice.streak();
+
+    const lvl = GuitarPractice.levelFromXp(totalXp);
+    document.getElementById('level-num').textContent = lvl.level;
+    document.getElementById('level-name').textContent = lvl.name;
+    if (lvl.nextMin !== null) {
+        const range = lvl.nextMin - lvl.currentMin;
+        const have = totalXp - lvl.currentMin;
+        const pct = Math.min(100, Math.round(have/range*100));
+        document.getElementById('level-fill').style.width = pct + '%';
+        document.getElementById('level-progress-text').textContent = `${lvl.nextMin - totalXp} XP to next level`;
+    } else {
+        document.getElementById('level-fill').style.width = '100%';
+        document.getElementById('level-progress-text').textContent = 'Max level reached!';
+    }
+
+    // Calendar — last 56 days, ending today.
+    const cal = document.getElementById('calendar');
+    cal.innerHTML = '';
+    const todayDate = new Date();
+    for (let i = 55; i >= 0; i--) {
+        const d = new Date(todayDate);
+        d.setDate(d.getDate() - i);
+        const k = dayKey(d);
+        const dayData = data.days[k];
+        const cell = document.createElement('div');
+        cell.className = 'day-cell';
+        if (k === today) cell.classList.add('today');
+        if (dayData) {
+            const xp = dayData.totalXp;
+            cell.dataset.xp = xp;
+            const heat = xp >= 80 ? 4 : xp >= 40 ? 3 : xp >= 20 ? 2 : xp > 0 ? 1 : 0;
+            if (heat > 0) cell.classList.add(`heat-${heat}`);
+        }
+        const tip = document.createElement('div');
+        tip.className = 'day-tooltip';
+        tip.textContent = `${k}: ${dayData ? dayData.totalXp + ' XP' : 'no practice'}`;
+        cell.appendChild(tip);
+        cal.appendChild(cell);
+    }
+
+    // Feature breakdown.
+    const fList = document.getElementById('feature-list');
+    fList.innerHTML = '';
+    const features = data.features || {};
+    const keys = Object.keys(features).sort((a, b) => features[b].totalXp - features[a].totalXp);
+    if (keys.length === 0) {
+        fList.innerHTML = '<p class="text-muted text-center mb-0">No practice yet — go play with any feature on the home page!</p>';
+        return;
+    }
+    keys.forEach(k => {
+        const row = document.createElement('div');
+        row.className = 'feature-row';
+        const name = FeatureNames[k] || k;
+        const last = features[k].lastSession ? new Date(features[k].lastSession).toLocaleDateString() : '—';
+        row.innerHTML = `<span><strong>${name}</strong> <span class="text-muted small">(last: ${last})</span></span>
+            <span><strong>${features[k].totalXp}</strong> XP</span>`;
+        fList.appendChild(row);
+    });
+}
+
+document.getElementById('reset-btn').addEventListener('click', () => {
+    if (confirm('Erase all practice data?')) {
+        GuitarPractice.reset();
+        render();
+    }
+});
+
+render();
+</script>
+</body>
+</html>

@@ -121,6 +121,54 @@ def serve_guitar_sample(string_folder, filename):
 def ear_training():
     return render_template('ear_training.html')
 
+@app.route('/guitar/chord-ear-training')
+def chord_ear_training():
+    return render_template('chord_ear_training.html')
+
+@app.route('/guitar/fretboard-trainer')
+def fretboard_trainer():
+    return render_template('fretboard_trainer.html')
+
+@app.route('/guitar/interval-trainer')
+def interval_trainer():
+    return render_template('interval_trainer.html')
+
+@app.route('/guitar/chord-progression')
+def chord_progression():
+    return render_template('chord_progression.html')
+
+@app.route('/guitar/find-the-key')
+def find_the_key():
+    return render_template('find_the_key.html')
+
+@app.route('/guitar/tuner')
+def tuner():
+    return render_template('tuner.html')
+
+@app.route('/guitar/strum-trainer')
+def strum_trainer():
+    return render_template('strum_trainer.html')
+
+@app.route('/guitar/chord-speed-drill')
+def chord_speed_drill():
+    return render_template('chord_speed_drill.html')
+
+@app.route('/guitar/backing-jam')
+def backing_jam():
+    return render_template('backing_jam.html')
+
+@app.route('/guitar/tab-reader')
+def tab_reader():
+    return render_template('tab_reader.html')
+
+@app.route('/guitar/practice-streak')
+def practice_streak():
+    return render_template('practice_streak.html')
+
+@app.route('/guitar/audio-to-tab')
+def audio_to_tab():
+    return render_template('audio_to_tab.html')
+
 @app.route('/guitar/identify_notes')
 def identify_notes():
     return render_template('identify_notes.html')
@@ -200,6 +248,74 @@ def is_chord_line(line):
     return all(CHORD_TOKEN_RE.match(t) for t in tokens)
 
 
+# Open-position chords most beginners learn first.
+EASY_CHORDS = {'C', 'D', 'G', 'A', 'E', 'Am', 'Em', 'Dm'}
+# Common barre / sus chords — typical "second-step" difficulty.
+MEDIUM_CHORDS = {'F', 'Bm', 'B', 'F#m', 'Fm', 'C#m', 'G#m', 'Bb', 'F#', 'Eb', 'Ab', 'Db'}
+
+
+def extract_chords(content):
+    if not content:
+        return []
+    found = []
+    for line in content.split('\n'):
+        if is_chord_line(line):
+            for tok in line.split():
+                found.append(tok)
+    return found
+
+
+def classify_song_difficulty(content):
+    """Tag a song Easy / Medium / Hard based on the chords it uses.
+
+    - Easy: only open-position major/minor chords (C, D, G, A, E, Am, Em, Dm).
+    - Medium: includes barre or sus chords, but no extensions.
+    - Hard: any 7ths, extensions, slash chords, diminished/augmented, etc.
+    """
+    chords = extract_chords(content)
+    if not chords:
+        return 'Easy'
+    has_extension = False
+    has_medium = False
+    only_easy = True
+    for c in chords:
+        # Strip slash bass for the difficulty check on the main chord.
+        main = c.split('/')[0]
+        # Anything with a digit, sus, dim, aug, maj is at least medium/hard.
+        if any(tok in c for tok in ('7', '9', '11', '13', 'maj', 'dim', 'aug', 'add')):
+            has_extension = True
+            only_easy = False
+            continue
+        if 'sus' in main:
+            has_medium = True
+            only_easy = False
+            continue
+        if main in EASY_CHORDS:
+            continue
+        if main in MEDIUM_CHORDS:
+            has_medium = True
+            only_easy = False
+        else:
+            # Unknown chord — treat conservatively as medium.
+            has_medium = True
+            only_easy = False
+        # Slash chord with a non-trivial bass nudges difficulty up.
+        if '/' in c:
+            has_medium = True
+            only_easy = False
+    if has_extension:
+        return 'Hard'
+    if has_medium:
+        return 'Medium'
+    return 'Easy' if only_easy else 'Medium'
+
+
+def annotate_songs(songs):
+    for s in songs:
+        s['difficulty'] = classify_song_difficulty(s.get('content', ''))
+    return songs
+
+
 @app.template_filter('songfmt')
 def render_song_content(content):
     """Render song content as one <div> per line, classified as section /
@@ -238,6 +354,7 @@ def inject_admin_flag():
 @app.route('/guitar/songs')
 def songs_list():
     songs = sorted(load_songs(), key=lambda s: s.get('title', '').lower())
+    annotate_songs(songs)
     return render_template('songs_list.html', songs=songs)
 
 

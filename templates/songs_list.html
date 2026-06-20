@@ -91,6 +91,25 @@
         }
         .page-ellipsis { padding: 0 0.5rem; color: #6b7280; align-self: center; }
         .empty-search-results { text-align: center; padding: 2rem 1rem; color: #6b7280; }
+
+        .difficulty-badge {
+            display: inline-block; padding: 2px 8px; border-radius: 999px;
+            font-size: 0.75rem; font-weight: 600; margin-left: 6px;
+            vertical-align: middle;
+        }
+        .difficulty-Easy   { background: #d1f7dc; color: #166534; }
+        .difficulty-Medium { background: #fff3cd; color: #856404; }
+        .difficulty-Hard   { background: #fde2e1; color: #b91c1c; }
+        .filter-row {
+            display: flex; gap: 8px; flex-wrap: wrap; margin-bottom: 0.75rem;
+        }
+        .filter-chip {
+            background: white; border: 1px solid #d1d5db; color: #374151;
+            border-radius: 999px; padding: 4px 12px; font-size: 0.85rem; cursor: pointer;
+        }
+        .filter-chip.active {
+            background: #2563eb; color: white; border-color: #2563eb;
+        }
     </style>
 </head>
 <body>
@@ -127,14 +146,25 @@
                 </div>
             </div>
 
+            <div class="filter-row" id="filter-row">
+                <span class="filter-chip active" data-difficulty="all">All</span>
+                <span class="filter-chip" data-difficulty="Easy">Easy</span>
+                <span class="filter-chip" data-difficulty="Medium">Medium</span>
+                <span class="filter-chip" data-difficulty="Hard">Hard</span>
+            </div>
+
             <div class="results-meta" id="results-meta"></div>
 
             <div id="results-container">
                 {% for song in songs %}
                     <a href="{{ url_for('song_view', song_id=song.id) }}" class="song-card js-song-card"
                        data-title="{{ (song.title or '')|lower }}"
-                       data-artist="{{ (song.artist or '')|lower }}">
-                        <div class="song-card-title">{{ song.title }}</div>
+                       data-artist="{{ (song.artist or '')|lower }}"
+                       data-difficulty="{{ song.difficulty }}">
+                        <div class="song-card-title">
+                            {{ song.title }}
+                            <span class="difficulty-badge difficulty-{{ song.difficulty }}">{{ song.difficulty }}</span>
+                        </div>
                         {% if song.artist %}
                             <div class="song-card-artist">{{ song.artist }}</div>
                         {% endif %}
@@ -180,11 +210,13 @@
 
             var query = '';
             var page = 1;
+            var difficulty = 'all';
 
             function matching() {
                 var q = query.toLowerCase().trim();
-                if (!q) return cards.slice();
                 return cards.filter(function (c) {
+                    if (difficulty !== 'all' && c.dataset.difficulty !== difficulty) return false;
+                    if (!q) return true;
                     return (c.dataset.title || '').indexOf(q) >= 0
                         || (c.dataset.artist || '').indexOf(q) >= 0;
                 });
@@ -284,6 +316,16 @@
                     render();
                     window.scrollTo({ top: 0, behavior: 'smooth' });
                 }
+            });
+
+            document.getElementById('filter-row').addEventListener('click', function (e) {
+                var chip = e.target.closest && e.target.closest('.filter-chip');
+                if (!chip) return;
+                document.querySelectorAll('.filter-chip').forEach(function (c) { c.classList.remove('active'); });
+                chip.classList.add('active');
+                difficulty = chip.dataset.difficulty;
+                page = 1;
+                render();
             });
 
             render();

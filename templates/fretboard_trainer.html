@@ -1,0 +1,379 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Fretboard Note Trainer</title>
+    <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.2.3/dist/css/bootstrap.min.css" rel="stylesheet">
+    <link href="https://cdn.jsdelivr.net/npm/bootstrap-icons@1.10.0/font/bootstrap-icons.css" rel="stylesheet">
+    <style>
+        body { background:#f4f4f4; font-family:Arial, sans-serif; }
+        .stat-pill {
+            display: inline-block; padding: 6px 14px; border-radius: 999px;
+            background: #fff; border: 1px solid #dee2e6; font-weight: 500;
+            margin: 0 4px;
+        }
+        .stat-pill .label { color:#6c757d; font-size:.85rem; margin-right:6px; }
+        .question-text { font-size: 1.6rem; font-weight: 600; }
+        .note-btn { min-width: 60px; margin: 4px; font-weight: 600; }
+        .note-btn.correct { background:#198754!important; color:#fff!important; border-color:#198754!important;}
+        .note-btn.incorrect { background:#dc3545!important; color:#fff!important; border-color:#dc3545!important;}
+        .feedback { min-height: 28px; font-weight: 500; }
+        .feedback.right { color:#198754; }
+        .feedback.wrong { color:#dc3545; }
+        .fb-svg-wrap { overflow-x:auto; }
+        .fb-svg-wrap svg { display:block; margin:0 auto; cursor:pointer; }
+        .mode-selector { display:flex; gap:8px; flex-wrap:wrap; justify-content:center; }
+    </style>
+</head>
+<body>
+<div class="container py-5">
+    <div class="text-center mb-4">
+        <h1 class="display-5 fw-bold">Fretboard Note Trainer</h1>
+        <p class="text-muted">Drill the notes across the fretboard until they're automatic.</p>
+        <a href="{{ url_for('guitar_landing') }}" class="btn btn-outline-primary"><i class="bi bi-arrow-left"></i> Back to Home</a>
+    </div>
+
+    <div class="text-center mb-3 mode-selector" id="mode-selector">
+        <button class="btn btn-outline-primary mode-btn active" data-mode="identify">Identify the Note (position → name)</button>
+        <button class="btn btn-outline-primary mode-btn" data-mode="locate">Locate the Note (name → position)</button>
+        <button class="btn btn-outline-secondary range-btn" data-range="natural">Naturals only</button>
+        <button class="btn btn-outline-secondary range-btn active" data-range="all">All 12 notes</button>
+    </div>
+
+    <div class="text-center mb-3">
+        <span class="stat-pill"><span class="label">Score</span><span id="score">0</span></span>
+        <span class="stat-pill"><span class="label">Streak</span><span id="streak">0</span></span>
+        <span class="stat-pill"><span class="label">Best Streak</span><span id="best">0</span></span>
+        <span class="stat-pill"><span class="label">XP</span><span id="xp">0</span></span>
+        <span class="stat-pill"><span class="label">Last</span><span id="last-time">—</span></span>
+    </div>
+
+    <div class="card border-0 shadow-sm">
+        <div class="card-body">
+            <div class="text-center mb-3">
+                <div id="question" class="question-text">Click "Start" to begin</div>
+                <div id="feedback" class="feedback mt-2"></div>
+            </div>
+
+            <div id="fb-wrap" class="fb-svg-wrap mb-3"></div>
+
+            <div id="answers" class="text-center mb-2 d-flex flex-wrap justify-content-center"></div>
+
+            <div class="text-center mt-2">
+                <button id="start-btn" class="btn btn-primary"><i class="bi bi-play-fill"></i> Start</button>
+                <button id="skip-btn" class="btn btn-outline-secondary" style="display:none;">Skip <i class="bi bi-arrow-right"></i></button>
+                <button id="end-btn" class="btn btn-outline-danger" style="display:none;"><i class="bi bi-stop-fill"></i> End Quiz</button>
+            </div>
+
+            <div id="summary" class="text-center mt-4" style="display:none;">
+                <div class="card border-0 shadow-sm mx-auto" style="max-width: 480px;">
+                    <div class="card-body">
+                        <h4 class="mb-3">Session Summary</h4>
+                        <div class="row g-2 mb-3">
+                            <div class="col-6"><div class="stat-pill w-100"><span class="label">Questions</span><span id="sum-questions">0</span></div></div>
+                            <div class="col-6"><div class="stat-pill w-100"><span class="label">Correct</span><span id="sum-score">0</span></div></div>
+                            <div class="col-6"><div class="stat-pill w-100"><span class="label">Accuracy</span><span id="sum-acc">0%</span></div></div>
+                            <div class="col-6"><div class="stat-pill w-100"><span class="label">Best Streak</span><span id="sum-best">0</span></div></div>
+                            <div class="col-4"><div class="stat-pill w-100"><span class="label">Avg</span><span id="sum-avg">—</span></div></div>
+                            <div class="col-4"><div class="stat-pill w-100"><span class="label">Fastest</span><span id="sum-min">—</span></div></div>
+                            <div class="col-4"><div class="stat-pill w-100"><span class="label">Slowest</span><span id="sum-max">—</span></div></div>
+                            <div class="col-12"><div class="stat-pill w-100"><span class="label">XP Earned</span><span id="sum-xp">0</span></div></div>
+                        </div>
+                        <button id="restart-btn" class="btn btn-primary"><i class="bi bi-arrow-counterclockwise"></i> Start New Quiz</button>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+
+<script src="{{ url_for('static', filename='js/practice.js') }}"></script>
+<script>
+const Chromatic = ['C','C#','D','D#','E','F','F#','G','G#','A','A#','B'];
+const Naturals = ['C','D','E','F','G','A','B'];
+const Tuning = ['E','A','D','G','B','E'];   // index 0 = low E
+const StringPC = Tuning.map(n => Chromatic.indexOf(n));
+const FRETS = 12;
+
+const state = {
+    mode: 'identify',
+    range: 'all',
+    score: 0, streak: 0, best: Number(localStorage.getItem('fbBestStreak') || 0),
+    sessionBest: 0,
+    answered: 0,
+    xp: 0,
+    times: [],          // reaction times in ms for answered questions
+    questionStart: 0,   // timestamp when current question was shown
+    current: null,    // {string, fret, note}
+    accepting: false,
+};
+
+document.getElementById('best').textContent = state.best;
+
+function notesPool() {
+    return state.range === 'natural' ? Naturals : Chromatic;
+}
+
+function pickQuestion() {
+    const pool = notesPool();
+    // In identify mode, skip fret 0 — the prompt names the open string by
+    // tuning ("string 5 (A)"), which trivially gives away the answer.
+    const minFret = state.mode === 'identify' ? 1 : 0;
+    while (true) {
+        const string = Math.floor(Math.random() * 6);
+        const fret = minFret + Math.floor(Math.random() * (FRETS + 1 - minFret));
+        const pc = (StringPC[string] + fret) % 12;
+        const note = Chromatic[pc];
+        if (pool.includes(note)) {
+            return { string, fret, note };
+        }
+    }
+}
+
+function renderFretboard(highlight) {
+    const stringSpacing = 30;
+    const fretSpacing = 50;
+    const startX = 40;
+    const startY = 25;
+    const W = startX + (FRETS + 1) * fretSpacing + 20;
+    const H = startY + 5 * stringSpacing + 40;
+
+    let svg = `<svg width="${W}" height="${H}" xmlns="http://www.w3.org/2000/svg">`;
+    svg += `<rect x="${startX}" y="${startY}" width="${FRETS * fretSpacing}" height="${5 * stringSpacing}" fill="#f4e4d0"/>`;
+    svg += `<rect x="${startX - 4}" y="${startY}" width="6" height="${5 * stringSpacing}" fill="#222"/>`;
+
+    for (let f = 0; f <= FRETS; f++) {
+        const x = startX + f * fretSpacing;
+        svg += `<line x1="${x}" y1="${startY}" x2="${x}" y2="${startY + 5 * stringSpacing}" stroke="#888" stroke-width="1.5"/>`;
+    }
+    [3,5,7,9].forEach(f => {
+        const cx = startX + (f - 0.5) * fretSpacing;
+        svg += `<circle cx="${cx}" cy="${startY + 2.5 * stringSpacing}" r="5" fill="#d4b896"/>`;
+    });
+    const cx12 = startX + (12 - 0.5) * fretSpacing;
+    svg += `<circle cx="${cx12}" cy="${startY + 1.5 * stringSpacing}" r="5" fill="#d4b896"/>`;
+    svg += `<circle cx="${cx12}" cy="${startY + 3.5 * stringSpacing}" r="5" fill="#d4b896"/>`;
+
+    for (let s = 0; s < 6; s++) {
+        const y = startY + s * stringSpacing;
+        const t = 1 + (5 - s) * 0.3;
+        svg += `<line x1="${startX}" y1="${y}" x2="${startX + FRETS * fretSpacing}" y2="${y}" stroke="#333" stroke-width="${t}"/>`;
+    }
+    for (let s = 0; s < 6; s++) {
+        svg += `<text x="${startX - 12}" y="${startY + s * stringSpacing + 4}" text-anchor="end" font-size="11" fill="#666">${Tuning[s]}</text>`;
+    }
+    for (let f = 1; f <= FRETS; f++) {
+        const x = startX + (f - 0.5) * fretSpacing;
+        const y = startY + 5 * stringSpacing + 18;
+        svg += `<text x="${x}" y="${y}" text-anchor="middle" font-size="11" fill="#555">${f}</text>`;
+    }
+
+    if (state.mode === 'locate') {
+        // Make every position clickable.
+        for (let s = 0; s < 6; s++) {
+            for (let f = 0; f <= FRETS; f++) {
+                const cx = f === 0 ? startX - 14 : startX + (f - 0.5) * fretSpacing;
+                const cy = startY + s * stringSpacing;
+                svg += `<circle data-s="${s}" data-f="${f}" cx="${cx}" cy="${cy}" r="11" fill="rgba(13,110,253,0.0)" stroke="rgba(13,110,253,0.0)" class="hot"/>`;
+            }
+        }
+    }
+
+    if (highlight) {
+        const cx = highlight.fret === 0 ? startX - 14 : startX + (highlight.fret - 0.5) * fretSpacing;
+        const cy = startY + highlight.string * stringSpacing;
+        const fill = highlight.kind === 'right' ? '#198754' : highlight.kind === 'wrong' ? '#dc3545' : '#0d6efd';
+        svg += `<circle cx="${cx}" cy="${cy}" r="13" fill="${fill}" stroke="#fff" stroke-width="2"/>`;
+        if (highlight.label) {
+            svg += `<text x="${cx}" y="${cy + 4}" text-anchor="middle" font-size="11" fill="#fff" font-weight="bold">${highlight.label}</text>`;
+        } else {
+            svg += `<text x="${cx}" y="${cy + 4}" text-anchor="middle" font-size="11" fill="#fff" font-weight="bold">?</text>`;
+        }
+    }
+
+    svg += `</svg>`;
+    document.getElementById('fb-wrap').innerHTML = svg;
+
+    if (state.mode === 'locate') {
+        document.querySelectorAll('#fb-wrap .hot').forEach(c => {
+            c.style.cursor = 'pointer';
+            c.addEventListener('mouseenter', () => c.setAttribute('fill', 'rgba(13,110,253,0.18)'));
+            c.addEventListener('mouseleave', () => c.setAttribute('fill', 'rgba(13,110,253,0.0)'));
+            c.addEventListener('click', () => {
+                if (!state.accepting) return;
+                const s = Number(c.dataset.s);
+                const f = Number(c.dataset.f);
+                const pc = (StringPC[s] + f) % 12;
+                const note = Chromatic[pc];
+                handleAnswer(note, { string: s, fret: f });
+            });
+        });
+    }
+}
+
+function renderAnswers() {
+    const el = document.getElementById('answers');
+    el.innerHTML = '';
+    if (state.mode !== 'identify') return;
+    const pool = notesPool();
+    pool.forEach(n => {
+        const b = document.createElement('button');
+        b.className = 'btn btn-outline-primary note-btn';
+        b.textContent = n;
+        b.addEventListener('click', () => {
+            if (!state.accepting) return;
+            handleAnswer(n);
+            if (n !== state.current.note) b.classList.add('incorrect');
+            else b.classList.add('correct');
+        });
+        el.appendChild(b);
+    });
+}
+
+function handleAnswer(picked, picked_pos) {
+    state.accepting = false;
+    state.answered++;
+    const elapsed = performance.now() - state.questionStart;
+    state.times.push(elapsed);
+    const correct = picked === state.current.note;
+    const feedback = document.getElementById('feedback');
+    if (correct) {
+        state.score++;
+        state.streak++;
+        state.xp += 5;
+        if (state.streak > state.sessionBest) state.sessionBest = state.streak;
+        if (state.streak > state.best) {
+            state.best = state.streak;
+            localStorage.setItem('fbBestStreak', state.best);
+        }
+        feedback.textContent = `Correct — ${state.current.note} (${(elapsed / 1000).toFixed(2)}s)`;
+        feedback.className = 'feedback right';
+        if (window.GuitarPractice) GuitarPractice.record('fretboard-trainer', 5);
+    } else {
+        state.streak = 0;
+        feedback.textContent = `Was ${state.current.note}. You picked ${picked}. (${(elapsed / 1000).toFixed(2)}s)`;
+        feedback.className = 'feedback wrong';
+    }
+    document.getElementById('last-time').textContent = `${(elapsed / 1000).toFixed(2)}s`;
+    document.getElementById('score').textContent = state.score;
+    document.getElementById('streak').textContent = state.streak;
+    document.getElementById('best').textContent = state.best;
+    document.getElementById('xp').textContent = state.xp;
+
+    renderFretboard({
+        string: state.current.string,
+        fret: state.current.fret,
+        kind: correct ? 'right' : 'wrong',
+        label: state.current.note,
+    });
+
+    setTimeout(() => nextQuestion(), 900);
+}
+
+function nextQuestion() {
+    state.current = pickQuestion();
+    state.accepting = true;
+    const q = state.current;
+    if (state.mode === 'identify') {
+        document.getElementById('question').textContent = `What note is at string ${6 - q.string} (${Tuning[q.string]}), fret ${q.fret}?`;
+        renderFretboard({ string: q.string, fret: q.fret, kind: 'ask' });
+    } else {
+        document.getElementById('question').textContent = `Find a "${q.note}" anywhere on the fretboard.`;
+        renderFretboard(null);
+    }
+    document.getElementById('feedback').textContent = '';
+    document.getElementById('feedback').className = 'feedback';
+    renderAnswers();
+    state.questionStart = performance.now();
+}
+
+document.getElementById('start-btn').addEventListener('click', () => {
+    document.getElementById('start-btn').style.display = 'none';
+    document.getElementById('skip-btn').style.display = 'inline-block';
+    document.getElementById('end-btn').style.display = 'inline-block';
+    nextQuestion();
+});
+document.getElementById('skip-btn').addEventListener('click', () => {
+    state.streak = 0;
+    document.getElementById('streak').textContent = 0;
+    nextQuestion();
+});
+document.getElementById('end-btn').addEventListener('click', () => endSession());
+document.getElementById('restart-btn').addEventListener('click', () => {
+    document.getElementById('summary').style.display = 'none';
+    state.score = 0;
+    state.streak = 0;
+    state.sessionBest = 0;
+    state.answered = 0;
+    state.xp = 0;
+    state.times = [];
+    document.getElementById('score').textContent = 0;
+    document.getElementById('streak').textContent = 0;
+    document.getElementById('xp').textContent = 0;
+    document.getElementById('last-time').textContent = '—';
+    document.getElementById('skip-btn').style.display = 'inline-block';
+    document.getElementById('end-btn').style.display = 'inline-block';
+    nextQuestion();
+});
+
+function endSession() {
+    state.accepting = false;
+    state.current = null;
+    document.getElementById('skip-btn').style.display = 'none';
+    document.getElementById('end-btn').style.display = 'none';
+    document.getElementById('start-btn').style.display = 'none';
+    document.getElementById('question').textContent = 'Quiz ended';
+    document.getElementById('feedback').textContent = '';
+    document.getElementById('feedback').className = 'feedback';
+    document.getElementById('answers').innerHTML = '';
+    renderFretboard(null);
+
+    const acc = state.answered ? Math.round((state.score / state.answered) * 100) : 0;
+    document.getElementById('sum-questions').textContent = state.answered;
+    document.getElementById('sum-score').textContent = state.score;
+    document.getElementById('sum-acc').textContent = `${acc}%`;
+    document.getElementById('sum-best').textContent = state.sessionBest;
+    document.getElementById('sum-xp').textContent = state.xp;
+
+    if (state.times.length) {
+        const avg = state.times.reduce((a, b) => a + b, 0) / state.times.length;
+        const min = Math.min(...state.times);
+        const max = Math.max(...state.times);
+        const fmt = ms => `${(ms / 1000).toFixed(2)}s`;
+        document.getElementById('sum-avg').textContent = fmt(avg);
+        document.getElementById('sum-min').textContent = fmt(min);
+        document.getElementById('sum-max').textContent = fmt(max);
+    } else {
+        document.getElementById('sum-avg').textContent = '—';
+        document.getElementById('sum-min').textContent = '—';
+        document.getElementById('sum-max').textContent = '—';
+    }
+    document.getElementById('summary').style.display = 'block';
+}
+
+document.querySelectorAll('.mode-btn').forEach(b => {
+    b.addEventListener('click', () => {
+        document.querySelectorAll('.mode-btn').forEach(x => x.classList.remove('active', 'btn-primary'));
+        document.querySelectorAll('.mode-btn').forEach(x => x.classList.add('btn-outline-primary'));
+        b.classList.remove('btn-outline-primary');
+        b.classList.add('btn-primary', 'active');
+        state.mode = b.dataset.mode;
+        if (state.current) nextQuestion();
+    });
+});
+document.querySelectorAll('.range-btn').forEach(b => {
+    b.addEventListener('click', () => {
+        document.querySelectorAll('.range-btn').forEach(x => x.classList.remove('active', 'btn-secondary'));
+        document.querySelectorAll('.range-btn').forEach(x => x.classList.add('btn-outline-secondary'));
+        b.classList.remove('btn-outline-secondary');
+        b.classList.add('btn-secondary', 'active');
+        state.range = b.dataset.range;
+        if (state.current) nextQuestion();
+    });
+});
+
+renderFretboard(null);
+</script>
+</body>
+</html>

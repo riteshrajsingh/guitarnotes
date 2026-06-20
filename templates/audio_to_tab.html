@@ -1,0 +1,364 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Audio to Tab</title>
+    <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.2.3/dist/css/bootstrap.min.css" rel="stylesheet">
+    <link href="https://cdn.jsdelivr.net/npm/bootstrap-icons@1.10.0/font/bootstrap-icons.css" rel="stylesheet">
+    <style>
+        body { background:#f4f4f4; font-family:Arial, sans-serif; }
+        .live-display {
+            background:#fff; border-radius:14px; padding:24px; text-align:center;
+            box-shadow:0 2px 10px rgba(0,0,0,.04); margin-bottom:18px;
+        }
+        .live-note {
+            font-size:4.5rem; font-weight:700; color:#0d6efd; line-height:1;
+        }
+        .live-note.idle { color:#adb5bd; }
+        .live-meta { color:#6c757d; margin-top:6px; }
+        .vu-wrap { height:8px; background:#e9ecef; border-radius:4px; margin-top:12px; overflow:hidden; }
+        .vu-fill { height:100%; background:linear-gradient(90deg, #198754, #fd7e14, #dc3545); width:0%; transition:width .08s linear; }
+        .tab-canvas {
+            background:#fff; padding:18px; border-radius:14px; box-shadow:0 2px 10px rgba(0,0,0,.04);
+            font-family:'Courier New', monospace; font-size:1rem; line-height:1.55;
+            overflow-x:auto; white-space:pre;
+            min-height:200px;
+        }
+        .tab-line { display:block; }
+        .last-note {
+            background:#fff3cd; padding:0 2px; border-radius:3px;
+        }
+        .stat-row { display:flex; gap:12px; flex-wrap:wrap; }
+        .stat-pill {
+            background:#fff; border:1px solid #dee2e6; border-radius:999px;
+            padding:6px 14px; font-weight:500;
+        }
+        .stat-pill .label { color:#6c757d; font-size:.85rem; margin-right:6px; }
+        .limit-note {
+            background:#fff3cd; border:1px solid #ffeeba; color:#856404;
+            border-radius:8px; padding:10px 14px; font-size:.9rem; margin-bottom:18px;
+        }
+    </style>
+</head>
+<body>
+<div class="container py-5">
+    <div class="text-center mb-4">
+        <h1 class="display-5 fw-bold">Audio to Tab</h1>
+        <p class="text-muted">Play single notes into the mic — they get transcribed to tab in real time.</p>
+        <a href="{{ url_for('guitar_landing') }}" class="btn btn-outline-primary"><i class="bi bi-arrow-left"></i> Back to Home</a>
+    </div>
+
+    <div style="max-width:1100px; margin:auto;">
+        <div class="limit-note">
+            <strong>Monophonic only.</strong> One note at a time — single-note riffs, melodies, scales.
+            Chords and fingerstyle won't transcribe correctly. Best results: clean tone, quiet room,
+            mic close to the soundhole or pickup output.
+        </div>
+
+        <div class="live-display">
+            <div id="live-note" class="live-note idle">—</div>
+            <div id="live-meta" class="live-meta">Press Start and allow microphone access</div>
+            <div class="vu-wrap"><div id="vu-fill" class="vu-fill"></div></div>
+        </div>
+
+        <div class="d-flex flex-wrap align-items-center justify-content-between mb-3" style="gap:12px;">
+            <div class="stat-row">
+                <span class="stat-pill"><span class="label">Notes</span><span id="note-count">0</span></span>
+                <span class="stat-pill"><span class="label">Last</span><span id="last-pos">—</span></span>
+                <span class="stat-pill"><span class="label">Start fret</span>
+                    <select id="start-fret" class="form-select form-select-sm d-inline-block w-auto" style="vertical-align:middle;">
+                        <option value="auto" selected>Auto</option>
+                        <option value="0">0 (open)</option>
+                        <option value="3">3</option>
+                        <option value="5">5</option>
+                        <option value="7">7</option>
+                        <option value="9">9</option>
+                        <option value="12">12</option>
+                    </select>
+                </span>
+            </div>
+            <div>
+                <button id="start-btn" class="btn btn-primary"><i class="bi bi-mic-fill"></i> Start</button>
+                <button id="stop-btn" class="btn btn-outline-secondary ms-1" disabled><i class="bi bi-stop-fill"></i> Stop</button>
+                <button id="clear-btn" class="btn btn-outline-warning ms-1"><i class="bi bi-trash"></i> Clear</button>
+                <button id="copy-btn" class="btn btn-outline-success ms-1"><i class="bi bi-clipboard"></i> Copy Tab</button>
+            </div>
+        </div>
+
+        <div id="tab" class="tab-canvas">e|--
+B|--
+G|--
+D|--
+A|--
+E|--</div>
+
+        <p class="text-muted small mt-3 mb-0">
+            Tip: re-pluck the same note works — silence between plucks tells the transcriber it's a new attack.
+            Picked notes are placed on the string/fret closest to the previous note for natural fingering.
+        </p>
+    </div>
+</div>
+
+<script src="{{ url_for('static', filename='js/practice.js') }}"></script>
+<script>
+// String tuning open-pitch MIDI numbers (low E2..high E4)
+// Index 0 = low E (string 6 in tab), index 5 = high E (string 1 in tab)
+const STRING_OPEN_MIDI = [40, 45, 50, 55, 59, 64];
+const STRING_LABEL = ['E', 'A', 'D', 'G', 'B', 'e'];   // tab uses lowercase 'e' for high E
+const MAX_FRET = 17;
+const NOTE_NAMES = ['C','C#','D','D#','E','F','F#','G','G#','A','A#','B'];
+
+function midiToName(m) {
+    const pc = ((m % 12) + 12) % 12;
+    const oct = Math.floor(m / 12) - 1;
+    return NOTE_NAMES[pc] + oct;
+}
+function freqToMidi(f) {
+    return 69 + 12 * Math.log2(f / 440);
+}
+
+// Pick (string, fret) for a given target MIDI. If prevPos exists, prefer the
+// position with the smallest absolute fret distance from prevPos (and a small
+// penalty for changing strings). Otherwise pick a comfortable low-fret position
+// near the user's preferred starting region.
+function pickPosition(targetMidi, prevPos, preferredFret) {
+    const candidates = [];
+    for (let s = 0; s < 6; s++) {
+        const fret = targetMidi - STRING_OPEN_MIDI[s];
+        if (fret >= 0 && fret <= MAX_FRET) candidates.push({ s, fret });
+    }
+    if (candidates.length === 0) return null;
+    if (prevPos) {
+        candidates.sort((a, b) => {
+            const da = Math.abs(a.fret - prevPos.fret) + Math.abs(a.s - prevPos.s) * 0.6;
+            const db = Math.abs(b.fret - prevPos.fret) + Math.abs(b.s - prevPos.s) * 0.6;
+            return da - db;
+        });
+        return candidates[0];
+    }
+    candidates.sort((a, b) => {
+        const da = Math.abs(a.fret - preferredFret);
+        const db = Math.abs(b.fret - preferredFret);
+        return da - db || a.fret - b.fret;
+    });
+    return candidates[0];
+}
+
+// Autocorrelation pitch detection (same as tuner).
+function autoCorrelate(buf, sampleRate) {
+    const SIZE = buf.length;
+    let rms = 0;
+    for (let i = 0; i < SIZE; i++) rms += buf[i] * buf[i];
+    rms = Math.sqrt(rms / SIZE);
+    if (rms < 0.015) return { freq: -1, rms };
+    let r1 = 0, r2 = SIZE - 1;
+    for (let i = 0; i < SIZE / 2; i++) if (Math.abs(buf[i]) < 0.2) { r1 = i; break; }
+    for (let i = 1; i < SIZE / 2; i++) if (Math.abs(buf[SIZE - i]) < 0.2) { r2 = SIZE - i; break; }
+    const trimmed = buf.slice(r1, r2);
+    const N = trimmed.length;
+    const c = new Array(N).fill(0);
+    for (let i = 0; i < N; i++) for (let j = 0; j < N - i; j++) c[i] += trimmed[j] * trimmed[j + i];
+    let d = 0;
+    while (d + 1 < N && c[d] > c[d + 1]) d++;
+    let maxval = -1, maxpos = -1;
+    for (let i = d; i < N; i++) if (c[i] > maxval) { maxval = c[i]; maxpos = i; }
+    let T0 = maxpos;
+    if (T0 > 0 && T0 + 1 < N) {
+        const x1 = c[T0 - 1], x2 = c[T0], x3 = c[T0 + 1];
+        const a = (x1 + x3 - 2 * x2) / 2, b = (x3 - x1) / 2;
+        if (a) T0 = T0 - b / (2 * a);
+    }
+    return { freq: sampleRate / T0, rms };
+}
+
+const state = {
+    audioCtx: null, analyser: null, mediaStream: null, rafId: null,
+    isRunning: false,
+    notes: [],          // committed: [{ midi, s, fret }]
+    currentMidi: null,  // currently sustaining
+    currentPos: null,
+    candidateMidi: null,
+    candidateFrames: 0,
+    silenceFrames: 0,
+    lastTabRenderCount: -1,
+};
+
+const STABILITY_FRAMES = 4;     // ~70ms at 60fps
+const SILENCE_RESET_FRAMES = 8; // ~130ms — re-pluck same note allowed after this
+const SAME_NOTE_TOL = 0.4;      // within 40 cents of current = "same note continuing"
+
+async function start() {
+    if (state.isRunning) return;
+    try {
+        state.mediaStream = await navigator.mediaDevices.getUserMedia({
+            audio: { echoCancellation: false, noiseSuppression: false, autoGainControl: false },
+        });
+    } catch (e) {
+        document.getElementById('live-meta').textContent = 'Microphone access denied: ' + e.message;
+        return;
+    }
+    state.audioCtx = new (window.AudioContext || window.webkitAudioContext)();
+    const src = state.audioCtx.createMediaStreamSource(state.mediaStream);
+    state.analyser = state.audioCtx.createAnalyser();
+    state.analyser.fftSize = 4096;
+    src.connect(state.analyser);
+    state.isRunning = true;
+    document.getElementById('start-btn').disabled = true;
+    document.getElementById('stop-btn').disabled = false;
+    loop();
+}
+
+function stop() {
+    state.isRunning = false;
+    if (state.rafId) cancelAnimationFrame(state.rafId);
+    state.rafId = null;
+    if (state.mediaStream) state.mediaStream.getTracks().forEach(t => t.stop());
+    if (state.audioCtx) state.audioCtx.close();
+    state.audioCtx = null; state.analyser = null; state.mediaStream = null;
+    state.currentMidi = null; state.currentPos = null;
+    state.candidateMidi = null; state.candidateFrames = 0; state.silenceFrames = 0;
+    document.getElementById('start-btn').disabled = false;
+    document.getElementById('stop-btn').disabled = true;
+    setLive('—', 'Stopped.', 'idle', 0);
+    if (state.notes.length > 0 && window.GuitarPractice) {
+        GuitarPractice.record('audio-to-tab', Math.min(60, state.notes.length * 2));
+    }
+}
+
+function clearTab() {
+    state.notes = [];
+    state.currentMidi = null; state.currentPos = null;
+    state.candidateMidi = null; state.candidateFrames = 0;
+    renderTab();
+    document.getElementById('note-count').textContent = '0';
+    document.getElementById('last-pos').textContent = '—';
+}
+
+function setLive(noteText, metaText, klass, level) {
+    const ln = document.getElementById('live-note');
+    ln.textContent = noteText;
+    ln.className = 'live-note ' + (klass || '');
+    document.getElementById('live-meta').textContent = metaText;
+    document.getElementById('vu-fill').style.width = Math.min(100, level * 200) + '%';
+}
+
+function commitNote(midi) {
+    const startFretSel = document.getElementById('start-fret').value;
+    const preferredFret = startFretSel === 'auto' ? 5 : Number(startFretSel);
+    const pos = pickPosition(midi, state.currentPos, preferredFret);
+    if (!pos) return;
+    state.notes.push({ midi, s: pos.s, fret: pos.fret });
+    state.currentMidi = midi;
+    state.currentPos = pos;
+    document.getElementById('note-count').textContent = state.notes.length;
+    document.getElementById('last-pos').textContent = `${midiToName(midi)} (string ${6 - pos.s}, fret ${pos.fret})`;
+    renderTab();
+}
+
+function loop() {
+    state.rafId = requestAnimationFrame(loop);
+    if (!state.analyser) return;
+    const buf = new Float32Array(state.analyser.fftSize);
+    state.analyser.getFloatTimeDomainData(buf);
+    const { freq, rms } = autoCorrelate(buf, state.audioCtx.sampleRate);
+
+    // Quiet — count silence frames; reset current after enough silence so a
+    // re-pluck of the same note registers as a new event.
+    if (freq === -1 || freq < 60 || freq > 1500) {
+        state.silenceFrames++;
+        state.candidateMidi = null; state.candidateFrames = 0;
+        if (state.silenceFrames > SILENCE_RESET_FRAMES) {
+            state.currentMidi = null;
+        }
+        setLive('—', state.silenceFrames > SILENCE_RESET_FRAMES ? 'Listening…' : 'Releasing…', 'idle', rms);
+        return;
+    }
+    state.silenceFrames = 0;
+
+    const midiF = freqToMidi(freq);
+    const midi = Math.round(midiF);
+    const cents = (midiF - midi) * 100;
+
+    setLive(midiToName(midi), `${freq.toFixed(1)} Hz · ${cents >= 0 ? '+' : ''}${cents.toFixed(0)}¢`, '', rms);
+
+    // Same note continuing — keep candidate clear, don't recommit.
+    if (state.currentMidi !== null && Math.abs(midiF - state.currentMidi) < SAME_NOTE_TOL) {
+        state.candidateMidi = null; state.candidateFrames = 0;
+        return;
+    }
+
+    // First note of session, or different from current — gather stability.
+    if (state.candidateMidi === midi) {
+        state.candidateFrames++;
+    } else {
+        state.candidateMidi = midi;
+        state.candidateFrames = 1;
+    }
+    if (state.candidateFrames >= STABILITY_FRAMES) {
+        commitNote(midi);
+        state.candidateMidi = null;
+        state.candidateFrames = 0;
+    }
+}
+
+function renderTab() {
+    const lines = ['', '', '', '', '', ''];
+    // Tab convention: top = high E (s=5), bottom = low E (s=0). Iterate top-to-bottom for display.
+    if (state.notes.length === 0) {
+        for (let i = 0; i < 6; i++) {
+            const sIdx = 5 - i;
+            lines[i] = STRING_LABEL[sIdx] + '|--';
+        }
+    } else {
+        for (let i = 0; i < 6; i++) lines[i] = STRING_LABEL[5 - i] + '|';
+        state.notes.forEach((n, idx) => {
+            const fretStr = String(n.fret).padEnd(2, '-');
+            const isLast = idx === state.notes.length - 1;
+            for (let i = 0; i < 6; i++) {
+                const sIdx = 5 - i;
+                const cell = (n.s === sIdx)
+                    ? (isLast ? `<span class="last-note">${fretStr}</span>` : fretStr)
+                    : '--';
+                lines[i] += cell + '--';
+            }
+        });
+    }
+    document.getElementById('tab').innerHTML = lines.map(l => `<span class="tab-line">${l}</span>`).join('');
+    // Auto-scroll to keep the latest note visible.
+    const wrap = document.getElementById('tab');
+    wrap.scrollLeft = wrap.scrollWidth;
+}
+
+function plainTab() {
+    if (state.notes.length === 0) return '';
+    const lines = ['','','','','',''];
+    for (let i = 0; i < 6; i++) lines[i] = STRING_LABEL[5 - i] + '|';
+    state.notes.forEach(n => {
+        const fretStr = String(n.fret).padEnd(2, '-');
+        for (let i = 0; i < 6; i++) {
+            const sIdx = 5 - i;
+            lines[i] += (n.s === sIdx ? fretStr : '--') + '--';
+        }
+    });
+    return lines.join('\n');
+}
+
+document.getElementById('start-btn').addEventListener('click', start);
+document.getElementById('stop-btn').addEventListener('click', stop);
+document.getElementById('clear-btn').addEventListener('click', clearTab);
+document.getElementById('copy-btn').addEventListener('click', () => {
+    const txt = plainTab();
+    if (!txt) return;
+    navigator.clipboard.writeText(txt).then(() => {
+        const b = document.getElementById('copy-btn');
+        const orig = b.innerHTML;
+        b.innerHTML = '<i class="bi bi-check-lg"></i> Copied!';
+        setTimeout(() => { b.innerHTML = orig; }, 1200);
+    });
+});
+
+renderTab();
+</script>
+</body>
+</html>

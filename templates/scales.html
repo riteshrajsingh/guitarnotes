@@ -5,6 +5,7 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Scale Library</title>
     <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.2.3/dist/css/bootstrap.min.css" rel="stylesheet">
+    <link href="https://cdn.jsdelivr.net/npm/bootstrap-icons@1.10.0/font/bootstrap-icons.css" rel="stylesheet">
     <style>
         body {
             background-color: #f4f4f4;
@@ -26,6 +27,42 @@
         .dropdown-menu {
             max-height: 300px;
             overflow-y: auto;
+        }
+
+        /* Fretboard diagram */
+        .scale-fretboard-wrapper {
+            overflow-x: auto;
+            padding: 8px 0;
+        }
+        .scale-fretboard-wrapper svg {
+            display: block;
+            margin: 0 auto;
+        }
+        .position-tab-btn {
+            font-size: 0.9rem;
+            margin: 4px;
+        }
+        .finger-legend {
+            display: flex;
+            flex-wrap: wrap;
+            gap: 14px;
+            align-items: center;
+            justify-content: center;
+            margin-top: 12px;
+        }
+        .finger-legend-item {
+            display: inline-flex;
+            align-items: center;
+            gap: 6px;
+            font-size: 0.9rem;
+            color: #333;
+        }
+        .finger-dot {
+            display: inline-block;
+            width: 16px;
+            height: 16px;
+            border-radius: 50%;
+            border: 1.5px solid #222;
         }
     </style>
 </head>
@@ -107,6 +144,35 @@
                                 </div>
                             </div>
                         </div>
+
+                        <!-- Full Fretboard view -->
+                        <div id="full-fretboard-section" class="mt-4" style="display:none;">
+                            <h5 class="text-muted mb-3">Full Fretboard (frets 0-12):</h5>
+                            <div class="card border-0 bg-light">
+                                <div class="card-body">
+                                    <div id="full-fretboard-diagram" class="scale-fretboard-wrapper"></div>
+                                    <p class="text-muted small text-center mb-0 mt-2">
+                                        Root notes are highlighted darker. All scale tones are shown across all six strings.
+                                    </p>
+                                </div>
+                            </div>
+                        </div>
+
+                        <!-- Scale Position Boxes -->
+                        <div id="positions-section" class="mt-4" style="display:none;">
+                            <h5 class="text-muted mb-3">Position Boxes (with finger positions):</h5>
+                            <div class="card border-0 bg-light">
+                                <div class="card-body">
+                                    <div id="positions-tabs" class="text-center mb-3"></div>
+                                    <div id="position-diagram" class="scale-fretboard-wrapper"></div>
+                                    <div id="finger-legend" class="finger-legend"></div>
+                                    <p class="text-muted small text-center mt-3 mb-0">
+                                        Each position covers a 4-fret window. Numbers inside the dots show suggested fingers
+                                        (1 = Index, 2 = Middle, 3 = Ring, 4 = Pinky). Open string notes are shown above the nut.
+                                    </p>
+                                </div>
+                            </div>
+                        </div>
                     </div>
                 </div>
             </div>
@@ -115,286 +181,474 @@
 
     <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.2.3/dist/js/bootstrap.bundle.min.js"></script>
     <script>
-        // Comprehensive Scale Theory (same as previous version)
         const ScaleTheory = {
-        // Major Scales
-        Major: {
-            formula: 'W-W-H-W-W-W-H',
-            intervals: [0, 2, 4, 5, 7, 9, 11],
-            description: 'Ionian mode, the standard major scale'
-        },
-
-        // Minor Scales
-        NaturalMinor: {
-            formula: 'W-H-W-W-H-W-W',
-            intervals: [0, 2, 3, 5, 7, 8, 10],
-            description: 'Aeolian mode, the natural minor scale'
-        },
-        HarmonicMinor: {
-            formula: 'W-H-W-W-H-W+H-H',
-            intervals: [0, 2, 3, 5, 7, 8, 11],
-            description: 'Minor scale with raised 7th degree'
-        },
-        MelodicMinor: {
-            formula: 'W-H-W-W-W-W-H (ascending)',
-            intervals: [0, 2, 3, 5, 7, 9, 11],
-            description: 'Minor scale with raised 6th and 7th degrees when ascending'
-        },
-
-        // Modal Scales
-        Dorian: {
-            formula: 'W-H-W-W-W-H-W',
-            intervals: [0, 2, 3, 5, 7, 9, 10],
-            description: 'Minor mode with a raised 6th, common in jazz and folk music'
-        },
-        Phrygian: {
-            formula: 'H-W-W-W-H-W-W',
-            intervals: [0, 1, 3, 5, 7, 8, 10],
-            description: 'Dark, exotic scale with a distinctive flat 2nd'
-        },
-        Lydian: {
-            formula: 'W-W-W-H-W-W-H',
-            intervals: [0, 2, 4, 6, 7, 9, 11],
-            description: 'Bright scale with a raised 4th, often used in film scores'
-        },
-        Mixolydian: {
-            formula: 'W-W-H-W-W-H-W',
-            intervals: [0, 2, 4, 5, 7, 9, 10],
-            description: 'Major scale with a lowered 7th, common in blues and rock'
-        },
-        Locrian: {
-            formula: 'H-W-W-H-W-W-W',
-            intervals: [0, 1, 3, 5, 6, 8, 10],
-            description: 'Most dissonant mode, rarely used in traditional music'
-        },
-
-        // Additional Scales
-        WholeTone: {
-            formula: 'W-W-W-W-W-W',
-            intervals: [0, 2, 4, 6, 8, 10],
-            description: 'Symmetrical scale with equal whole steps, creates a dreamy sound'
-        },
-        Pentatonic: {
-            formula: 'W-W-W+H-W-W+H',
-            intervals: [0, 2, 4, 7, 9],
-            description: 'Five-note scale, fundamental to many musical traditions'
-        },
-        Blues: {
-            formula: 'W+H-H-H-W+H-W',
-            intervals: [0, 3, 5, 6, 7, 10],
-            description: 'Characteristic scale of blues music with blue notes'
-        },
-        Chromatic: {
-            formula: 'H-H-H-H-H-H-H-H-H-H-H',
-            intervals: [0, 1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11],
-            description: 'Scale containing all 12 semitones in an octave'
-        }
-    };
+            Major: {
+                formula: 'W-W-H-W-W-W-H',
+                intervals: [0, 2, 4, 5, 7, 9, 11],
+                description: 'Ionian mode, the standard major scale'
+            },
+            NaturalMinor: {
+                formula: 'W-H-W-W-H-W-W',
+                intervals: [0, 2, 3, 5, 7, 8, 10],
+                description: 'Aeolian mode, the natural minor scale'
+            },
+            HarmonicMinor: {
+                formula: 'W-H-W-W-H-W+H-H',
+                intervals: [0, 2, 3, 5, 7, 8, 11],
+                description: 'Minor scale with raised 7th degree'
+            },
+            MelodicMinor: {
+                formula: 'W-H-W-W-W-W-H (ascending)',
+                intervals: [0, 2, 3, 5, 7, 9, 11],
+                description: 'Minor scale with raised 6th and 7th degrees when ascending'
+            },
+            Dorian: {
+                formula: 'W-H-W-W-W-H-W',
+                intervals: [0, 2, 3, 5, 7, 9, 10],
+                description: 'Minor mode with a raised 6th, common in jazz and folk music'
+            },
+            Phrygian: {
+                formula: 'H-W-W-W-H-W-W',
+                intervals: [0, 1, 3, 5, 7, 8, 10],
+                description: 'Dark, exotic scale with a distinctive flat 2nd'
+            },
+            Lydian: {
+                formula: 'W-W-W-H-W-W-H',
+                intervals: [0, 2, 4, 6, 7, 9, 11],
+                description: 'Bright scale with a raised 4th, often used in film scores'
+            },
+            Mixolydian: {
+                formula: 'W-W-H-W-W-H-W',
+                intervals: [0, 2, 4, 5, 7, 9, 10],
+                description: 'Major scale with a lowered 7th, common in blues and rock'
+            },
+            Locrian: {
+                formula: 'H-W-W-H-W-W-W',
+                intervals: [0, 1, 3, 5, 6, 8, 10],
+                description: 'Most dissonant mode, rarely used in traditional music'
+            },
+            WholeTone: {
+                formula: 'W-W-W-W-W-W',
+                intervals: [0, 2, 4, 6, 8, 10],
+                description: 'Symmetrical scale with equal whole steps, creates a dreamy sound'
+            },
+            Pentatonic: {
+                formula: 'W-W-W+H-W-W+H',
+                intervals: [0, 2, 4, 7, 9],
+                description: 'Five-note scale, fundamental to many musical traditions'
+            },
+            Blues: {
+                formula: 'W+H-H-H-W+H-W',
+                intervals: [0, 3, 5, 6, 7, 10],
+                description: 'Characteristic scale of blues music with blue notes'
+            },
+            Chromatic: {
+                formula: 'H-H-H-H-H-H-H-H-H-H-H',
+                intervals: [0, 1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11],
+                description: 'Scale containing all 12 semitones in an octave'
+            }
+        };
 
         const ChromaticScale = ['C', 'C#', 'D', 'D#', 'E', 'F', 'F#', 'G', 'G#', 'A', 'A#', 'B'];
+
+        // Standard tuning, indexed 0..5 = low E (thickest) .. high E (thinnest).
+        const StringTuning = ['E', 'A', 'D', 'G', 'B', 'E'];
+        const StringPC = StringTuning.map(n => ChromaticScale.indexOf(n));
+
+        const FingerColors = {
+            1: '#2563eb',  // index — blue
+            2: '#16a34a',  // middle — green
+            3: '#ea580c',  // ring — orange
+            4: '#dc2626',  // pinky — red
+            0: '#6b7280',  // open string — gray
+        };
+
         let selectedRoot = null;
         let selectedScaleType = null;
 
-        // Ensure the DOM is fully loaded
         document.addEventListener('DOMContentLoaded', () => {
-            // Create chromatic scale buttons
-            const chromaticScaleContainer = document.getElementById('chromatic-scale');
-            ChromaticScale.forEach(note => {
-                const btn = document.createElement('button');
-                btn.className = 'btn btn-outline-primary root-note-btn';
-                btn.dataset.note = note;
-                btn.textContent = note;
-                btn.addEventListener('click', rootNoteClickHandler);
-                chromaticScaleContainer.appendChild(btn);
-            });
-
-            // Add event listeners to scale type buttons
+            createChromaticScale('C');
             document.querySelectorAll('.scale-btn').forEach(btn => {
                 btn.addEventListener('click', scaleTypeClickHandler);
             });
         });
 
+        function createChromaticScale(rootNote) {
+            const container = document.getElementById('chromatic-scale');
+            container.innerHTML = '';
+            const rootIndex = ChromaticScale.indexOf(rootNote);
+            const reordered = [
+                ...ChromaticScale.slice(rootIndex),
+                ...ChromaticScale.slice(0, rootIndex)
+            ];
+            reordered.forEach(note => {
+                const btn = document.createElement('button');
+                btn.className = 'btn btn-outline-primary root-note-btn';
+                btn.dataset.note = note;
+                btn.textContent = note;
+                btn.addEventListener('click', rootNoteClickHandler);
+                container.appendChild(btn);
+            });
+        }
+
         function rootNoteClickHandler(event) {
-            // Remove previous selection
             document.querySelectorAll('.root-note-btn').forEach(b => {
                 b.classList.remove('btn-primary');
                 b.classList.add('btn-outline-primary');
             });
-
-            // Add active state
             event.target.classList.remove('btn-outline-primary');
             event.target.classList.add('btn-primary');
 
-            // Show scale type container
             document.getElementById('scale-type-container').style.display = 'block';
-
-            // Store selected root
             selectedRoot = event.target.dataset.note;
+            createChromaticScale(selectedRoot);
+            // Re-apply highlight to clicked root after redraw.
+            const newRootBtn = document.querySelector(`.root-note-btn[data-note="${selectedRoot}"]`);
+            if (newRootBtn) {
+                newRootBtn.classList.remove('btn-outline-primary');
+                newRootBtn.classList.add('btn-primary');
+            }
 
-            // Reset scale details
             document.getElementById('scale-details').style.display = 'none';
+            document.getElementById('full-fretboard-section').style.display = 'none';
+            document.getElementById('positions-section').style.display = 'none';
             document.getElementById('selected-scale-name').innerHTML = '';
             document.getElementById('scale-formula').innerHTML = '';
             document.getElementById('scale-notes').innerHTML = '';
 
-            // Remove previous scale type selections
             document.querySelectorAll('.scale-btn').forEach(b => {
                 b.classList.remove('btn-success');
                 b.classList.add('btn-outline-success');
             });
-
-            // Reset selected scale type
             selectedScaleType = null;
         }
 
         function scaleTypeClickHandler(event) {
-            event.preventDefault(); // Prevent default for dropdown items
-
-            // Remove previous selection
+            event.preventDefault();
             document.querySelectorAll('.scale-btn').forEach(b => {
                 b.classList.remove('btn-success');
                 b.classList.add('btn-outline-success');
             });
-
-            // Add active state
             event.target.classList.remove('btn-outline-success');
             event.target.classList.add('btn-success');
-
-            // Store selected scale type
             selectedScaleType = event.target.dataset.scaleType;
-
-            // Calculate and display scale
             calculateScale();
         }
 
         function calculateScale() {
-            // Validate inputs
-            if (!selectedRoot) {
-                alert('Please select a root note first');
-                return;
-            }
-
-            if (!selectedScaleType) {
-                alert('Please select a scale type');
-                return;
-            }
-
-            // Get scale details
+            if (!selectedRoot || !selectedScaleType) return;
             const scaleDetails = ScaleTheory[selectedScaleType];
+            const rootPC = ChromaticScale.indexOf(selectedRoot);
+            const scaleNotes = scaleDetails.intervals.map(i =>
+                ChromaticScale[(rootPC + i) % 12]
+            );
 
-            // Calculate scale notes
-            const scaleNotes = scaleDetails.intervals.map(interval => {
-                const noteIndex = (ChromaticScale.indexOf(selectedRoot) + interval) % 12;
-                return ChromaticScale[noteIndex];
-            });
-
-            // Display scale details
-            const scaleDetailsContainer = document.getElementById('scale-details');
-            scaleDetailsContainer.style.display = 'block';
-
-            // Set scale name
+            document.getElementById('scale-details').style.display = 'block';
             document.getElementById('selected-scale-name').innerHTML =
                 `${selectedRoot} ${selectedScaleType} Scale`;
-
-            // Display scale formula and description
             document.getElementById('scale-formula').innerHTML =
                 `<strong>Formula:</strong> ${scaleDetails.formula}<br>
-                <strong>Description:</strong> ${scaleDetails.description}`;
+                 <strong>Description:</strong> ${scaleDetails.description}`;
 
-            // Display scale notes
-            const scaleNotesContainer = document.getElementById('scale-notes');
-            scaleNotesContainer.innerHTML = '';
+            const notesContainer = document.getElementById('scale-notes');
+            notesContainer.innerHTML = '';
+            scaleNotes.forEach(note => {
+                const el = document.createElement('span');
+                el.classList.add('badge', 'bg-success', 'fs-6');
+                el.textContent = note;
+                notesContainer.appendChild(el);
+            });
 
-            // Highlight scale notes in chromatic scale
-            const chromaticScaleContainer = document.getElementById('chromatic-scale');
-            chromaticScaleContainer.querySelectorAll('.root-note-btn').forEach(noteBtn => {
-                const note = noteBtn.dataset.note;
-                if (scaleNotes.includes(note)) {
-                    noteBtn.classList.add('btn-success');
-                    noteBtn.classList.remove('btn-outline-primary', 'btn-primary');
-                } else {
-                    noteBtn.classList.remove('btn-success');
-                    noteBtn.classList.add('btn-outline-primary');
+            // Highlight scale notes in chromatic selector.
+            document.querySelectorAll('.root-note-btn').forEach(btn => {
+                const note = btn.dataset.note;
+                if (scaleNotes.includes(note) && note !== selectedRoot) {
+                    btn.classList.add('btn-success');
+                    btn.classList.remove('btn-outline-primary');
+                } else if (note !== selectedRoot) {
+                    btn.classList.remove('btn-success');
+                    btn.classList.add('btn-outline-primary');
                 }
             });
 
-            // Create scale notes display
-            scaleNotes.forEach(note => {
-                const noteEl = document.createElement('span');
-                noteEl.classList.add('badge', 'bg-success', 'fs-6');
-                noteEl.textContent = note;
-                scaleNotesContainer.appendChild(noteEl);
+            renderFullFretboard(selectedRoot, selectedScaleType);
+            renderScalePositions(selectedRoot, selectedScaleType);
+        }
+
+        // ===== Fretboard rendering =====
+
+        function getScalePCs(rootNote, scaleType) {
+            const rootPC = ChromaticScale.indexOf(rootNote);
+            return new Set(ScaleTheory[scaleType].intervals.map(i => (rootPC + i) % 12));
+        }
+
+        function renderFullFretboard(rootNote, scaleType) {
+            const rootPC = ChromaticScale.indexOf(rootNote);
+            const scalePCs = getScalePCs(rootNote, scaleType);
+
+            const fretCount = 12;
+            const stringSpacing = 32;
+            const fretSpacing = 55;
+            const startX = 50;
+            const startY = 35;
+            const nutHeight = 7;
+            const W = startX + fretCount * fretSpacing + 30;
+            const H = startY + nutHeight + 5 * stringSpacing + 40;
+
+            let svg = `<svg width="${W}" height="${H}" xmlns="http://www.w3.org/2000/svg">`;
+
+            // Background
+            svg += `<rect x="${startX}" y="${startY + nutHeight}" width="${fretCount * fretSpacing}" height="${5 * stringSpacing}" fill="#f4e4d0"/>`;
+
+            // Nut
+            svg += `<rect x="${startX - 3}" y="${startY}" width="${fretCount * fretSpacing + 6}" height="${nutHeight}" fill="#222"/>`;
+
+            // Fret lines (vertical)
+            for (let f = 0; f <= fretCount; f++) {
+                const x = startX + f * fretSpacing;
+                svg += `<line x1="${x}" y1="${startY + nutHeight}" x2="${x}" y2="${startY + nutHeight + 5 * stringSpacing}" stroke="#888" stroke-width="1.5"/>`;
+            }
+
+            // Inlay dots (frets 3, 5, 7, 9, 12)
+            const inlayFrets = [3, 5, 7, 9];
+            inlayFrets.forEach(f => {
+                const cx = startX + (f - 0.5) * fretSpacing;
+                const cy = startY + nutHeight + 2.5 * stringSpacing;
+                svg += `<circle cx="${cx}" cy="${cy}" r="6" fill="#d4b896" opacity="0.5"/>`;
+            });
+            // Double dot at 12
+            const cx12 = startX + (12 - 0.5) * fretSpacing;
+            svg += `<circle cx="${cx12}" cy="${startY + nutHeight + 1.5 * stringSpacing}" r="6" fill="#d4b896" opacity="0.5"/>`;
+            svg += `<circle cx="${cx12}" cy="${startY + nutHeight + 3.5 * stringSpacing}" r="6" fill="#d4b896" opacity="0.5"/>`;
+
+            // String lines (horizontal) — index 0 = low E at the top.
+            for (let s = 0; s < 6; s++) {
+                const y = startY + nutHeight + s * stringSpacing;
+                const thickness = 1 + (5 - s) * 0.3;
+                svg += `<line x1="${startX}" y1="${y}" x2="${startX + fretCount * fretSpacing}" y2="${y}" stroke="#333" stroke-width="${thickness}"/>`;
+            }
+
+            // Fret numbers below
+            for (let f = 1; f <= fretCount; f++) {
+                const x = startX + (f - 0.5) * fretSpacing;
+                const y = startY + nutHeight + 5 * stringSpacing + 20;
+                svg += `<text x="${x}" y="${y}" text-anchor="middle" font-size="11" fill="#555" font-family="Arial">${f}</text>`;
+            }
+
+            // String labels at the left (tuning), low E at top, high E at bottom.
+            // Render strings index 5 (low E) at top so visually matches the chord library.
+            // We invert: top = low E (string idx 0 here), then A, D, G, B, high E.
+            for (let s = 0; s < 6; s++) {
+                const y = startY + nutHeight + s * stringSpacing + 4;
+                svg += `<text x="${startX - 12}" y="${y}" text-anchor="end" font-size="11" fill="#666" font-family="Arial">${StringTuning[s]}</text>`;
+            }
+
+            // Note markers — open + frets 1..12.
+            for (let s = 0; s < 6; s++) {
+                for (let f = 0; f <= fretCount; f++) {
+                    const pc = (StringPC[s] + f) % 12;
+                    if (!scalePCs.has(pc)) continue;
+                    const isRoot = pc === rootPC;
+                    const noteName = ChromaticScale[pc];
+
+                    let cx;
+                    if (f === 0) {
+                        cx = startX - 26;
+                    } else {
+                        cx = startX + (f - 0.5) * fretSpacing;
+                    }
+                    const cy = startY + nutHeight + s * stringSpacing;
+                    const fill = isRoot ? '#dc2626' : '#16a34a';
+                    const stroke = isRoot ? '#7f1d1d' : '#166534';
+                    svg += `<circle class="note-circle" data-s="${s}" data-f="${f}" cx="${cx}" cy="${cy}" r="11" fill="${fill}" stroke="${stroke}" stroke-width="1.5"/>`;
+                    svg += `<text x="${cx}" y="${cy + 4}" text-anchor="middle" font-size="10" fill="white" font-family="Arial" font-weight="bold" pointer-events="none">${noteName}</text>`;
+                }
+            }
+
+            svg += `</svg>`;
+            document.getElementById('full-fretboard-diagram').innerHTML = svg;
+            document.getElementById('full-fretboard-section').style.display = 'block';
+        }
+
+        // Build position boxes: for each scale note on the low-E string within
+        // frets 0..11, create a 4-fret window starting at that fret. Each note
+        // in the window gets a finger 1..4 (or "open" if fret 0).
+        function buildScalePositions(rootNote, scaleType) {
+            const scalePCs = getScalePCs(rootNote, scaleType);
+            const starts = new Set();
+            // Always include open position.
+            starts.add(0);
+            // Add a window starting at every scale tone on the low E string (frets 1..11).
+            for (let f = 1; f <= 11; f++) {
+                const pc = (StringPC[0] + f) % 12;
+                if (scalePCs.has(pc)) starts.add(f);
+            }
+            return Array.from(starts).sort((a, b) => a - b).map(startFret => {
+                const endFret = startFret + 3;
+                const notes = [];  // {string, fret, finger, note, isRoot}
+                const rootPC = ChromaticScale.indexOf(rootNote);
+                for (let s = 0; s < 6; s++) {
+                    // Include open string if startFret === 0 OR if open string is a scale tone
+                    // (we show it above the nut as a reference, but only flag as in-position
+                    // for the open box).
+                    if (startFret === 0) {
+                        const openPC = StringPC[s] % 12;
+                        if (scalePCs.has(openPC)) {
+                            notes.push({
+                                string: s, fret: 0, finger: 0,
+                                note: ChromaticScale[openPC],
+                                isRoot: openPC === rootPC,
+                            });
+                        }
+                    }
+                    for (let f = Math.max(1, startFret); f <= endFret; f++) {
+                        const pc = (StringPC[s] + f) % 12;
+                        if (scalePCs.has(pc)) {
+                            const finger = startFret === 0
+                                ? Math.min(4, f)            // 1->1, 2->2, 3->3, 4->4
+                                : (f - startFret + 1);      // window-relative
+                            notes.push({
+                                string: s, fret: f, finger: finger,
+                                note: ChromaticScale[pc],
+                                isRoot: pc === rootPC,
+                            });
+                        }
+                    }
+                }
+                return { startFret, endFret, notes };
             });
         }
 
-       function createChromaticScale(rootNote) {
-    const chromaticScaleContainer = document.getElementById('chromatic-scale');
-    chromaticScaleContainer.innerHTML = ''; // Clear existing buttons
+        function renderPositionDiagram(position, rootNote) {
+            const { startFret, endFret, notes } = position;
+            const displayStart = startFret === 0 ? 0 : startFret;
+            const displayEnd = startFret === 0 ? 3 : endFret;
+            const fretCount = displayEnd - displayStart + 1;
+            const showNut = displayStart === 0;
+            const openColX = showNut ? 32 : 0;  // space for open-string circles before the nut
 
-    // Reorder ChromaticScale to start from the selected root
-    const rootIndex = ChromaticScale.indexOf(rootNote);
-    const reorderedScale = [
-        ...ChromaticScale.slice(rootIndex),
-        ...ChromaticScale.slice(0, rootIndex)
-    ];
+            const stringSpacing = 36;
+            const fretSpacing = 60;
+            const startX = 40 + openColX;
+            const startY = 30;
+            const nutHeight = showNut ? 8 : 0;
+            const W = startX + fretCount * fretSpacing + 40;
+            const H = startY + nutHeight + 5 * stringSpacing + 50;
 
-    // Create chromatic scale buttons with the new order
-    reorderedScale.forEach(note => {
-        const btn = document.createElement('button');
-        btn.className = 'btn btn-outline-primary root-note-btn';
-        btn.dataset.note = note;
-        btn.textContent = note;
-        btn.addEventListener('click', rootNoteClickHandler);
-        chromaticScaleContainer.appendChild(btn);
-    });
-}
+            let svg = `<svg width="${W}" height="${H}" xmlns="http://www.w3.org/2000/svg">`;
 
-function rootNoteClickHandler(event) {
-    // Remove previous selection
-    document.querySelectorAll('.root-note-btn').forEach(b => {
-        b.classList.remove('btn-primary');
-        b.classList.add('btn-outline-primary');
-    });
+            // Background
+            svg += `<rect x="${startX}" y="${startY + nutHeight}" width="${fretCount * fretSpacing}" height="${5 * stringSpacing}" fill="#f4e4d0"/>`;
 
-    // Add active state
-    event.target.classList.remove('btn-outline-primary');
-    event.target.classList.add('btn-primary');
+            // Nut
+            if (showNut) {
+                svg += `<rect x="${startX - 3}" y="${startY}" width="${fretCount * fretSpacing + 6}" height="${nutHeight}" fill="#222"/>`;
+            }
 
-    // Show scale type container
-    document.getElementById('scale-type-container').style.display = 'block';
+            // Fret lines
+            for (let i = 0; i <= fretCount; i++) {
+                const x = startX + i * fretSpacing;
+                svg += `<line x1="${x}" y1="${startY + nutHeight}" x2="${x}" y2="${startY + nutHeight + 5 * stringSpacing}" stroke="#888" stroke-width="1.5"/>`;
+            }
 
-    // Store selected root
-    selectedRoot = event.target.dataset.note;
+            // Inlay dots
+            const inlayFrets = [3, 5, 7, 9, 12, 15, 17];
+            for (let i = 0; i < fretCount; i++) {
+                const fretNum = displayStart + (showNut ? i : i + 1);
+                if (inlayFrets.includes(fretNum) && fretNum !== 12) {
+                    const cx = startX + (i + (showNut ? 0.5 : -0.5)) * fretSpacing + (showNut ? 0 : fretSpacing);
+                    // Simpler: compute by index of fret in window
+                    const idxInWindow = showNut ? i : i;
+                    const cxFix = startX + (idxInWindow + (showNut ? 0.5 : 0.5)) * fretSpacing;
+                    const cy = startY + nutHeight + 2.5 * stringSpacing;
+                    svg += `<circle cx="${cxFix}" cy="${cy}" r="6" fill="#d4b896" opacity="0.5"/>`;
+                }
+            }
 
-    // Reorder chromatic scale based on selected root
-    createChromaticScale(selectedRoot);
+            // String lines
+            for (let s = 0; s < 6; s++) {
+                const y = startY + nutHeight + s * stringSpacing;
+                const thickness = 1 + (5 - s) * 0.3;
+                svg += `<line x1="${startX}" y1="${y}" x2="${startX + fretCount * fretSpacing}" y2="${y}" stroke="#333" stroke-width="${thickness}"/>`;
+            }
 
-    // Reset scale details
-    document.getElementById('scale-details').style.display = 'none';
-    document.getElementById('selected-scale-name').innerHTML = '';
-    document.getElementById('scale-formula').innerHTML = '';
-    document.getElementById('scale-notes').innerHTML = '';
+            // String tuning labels
+            for (let s = 0; s < 6; s++) {
+                const y = startY + nutHeight + s * stringSpacing + 4;
+                svg += `<text x="${startX - 10 - openColX}" y="${y}" text-anchor="end" font-size="11" fill="#666" font-family="Arial">${StringTuning[s]}</text>`;
+            }
 
-    // Remove previous scale type selections
-    document.querySelectorAll('.scale-btn').forEach(b => {
-        b.classList.remove('btn-success');
-        b.classList.add('btn-outline-success');
-    });
+            // Fret number labels (under the diagram)
+            for (let i = 0; i < fretCount; i++) {
+                const fretNum = displayStart + (showNut ? i : i + 1);
+                if (fretNum === 0) continue;
+                const x = startX + ((showNut ? i : i) + 0.5) * fretSpacing;
+                const y = startY + nutHeight + 5 * stringSpacing + 22;
+                svg += `<text x="${x}" y="${y}" text-anchor="middle" font-size="11" fill="#555" font-family="Arial">${fretNum}</text>`;
+            }
 
-    // Reset selected scale type
-    selectedScaleType = null;
-}
+            // Notes
+            notes.forEach(n => {
+                let cx;
+                if (n.fret === 0) {
+                    cx = startX - 18;
+                } else {
+                    const idxInWindow = showNut
+                        ? n.fret - displayStart       // displayStart=0; fret 1 -> idx 1
+                        : n.fret - displayStart;
+                    cx = startX + (idxInWindow - 0.5) * fretSpacing;
+                }
+                const cy = startY + nutHeight + n.string * stringSpacing;
+                const color = n.isRoot ? '#dc2626' : (FingerColors[n.finger] || '#16a34a');
+                const stroke = n.isRoot ? '#7f1d1d' : '#222';
+                const sw = n.isRoot ? 2.5 : 1.2;
+                svg += `<circle class="note-circle" data-s="${n.string}" data-f="${n.fret}" cx="${cx}" cy="${cy}" r="13" fill="${color}" stroke="${stroke}" stroke-width="${sw}"/>`;
+                const label = n.fret === 0 ? n.note : String(n.finger);
+                svg += `<text x="${cx}" y="${cy + 4}" text-anchor="middle" font-size="11" fill="white" font-family="Arial" font-weight="bold" pointer-events="none">${label}</text>`;
+            });
 
-// Modify the initial DOM loaded event listener
-document.addEventListener('DOMContentLoaded', () => {
-    // Initially create chromatic scale starting from C
-    createChromaticScale('C');
+            svg += `</svg>`;
+            return svg;
+        }
 
-    // Add event listeners to scale type buttons
-    document.querySelectorAll('.scale-btn').forEach(btn => {
-        btn.addEventListener('click', scaleTypeClickHandler);
-    });
-});
+        function renderScalePositions(rootNote, scaleType) {
+            const positions = buildScalePositions(rootNote, scaleType);
+            const tabsEl = document.getElementById('positions-tabs');
+            const diagramEl = document.getElementById('position-diagram');
+            const legendEl = document.getElementById('finger-legend');
+
+            legendEl.innerHTML = [
+                `<span class="finger-legend-item"><span class="finger-dot" style="background:#dc2626"></span>Root</span>`,
+                ...[1, 2, 3, 4].map(f =>
+                    `<span class="finger-legend-item"><span class="finger-dot" style="background:${FingerColors[f]}"></span>${f} ${['Index','Middle','Ring','Pinky'][f-1]}</span>`
+                )
+            ].join('');
+
+            tabsEl.innerHTML = '';
+            positions.forEach((pos, i) => {
+                const btn = document.createElement('button');
+                btn.type = 'button';
+                btn.className = 'btn btn-outline-primary position-tab-btn';
+                const label = pos.startFret === 0
+                    ? `Open Position (frets 0-3)`
+                    : `Position at fret ${pos.startFret} (${pos.startFret}-${pos.endFret})`;
+                btn.textContent = label;
+                btn.addEventListener('click', () => {
+                    tabsEl.querySelectorAll('.position-tab-btn').forEach(b => {
+                        b.classList.remove('btn-primary');
+                        b.classList.add('btn-outline-primary');
+                    });
+                    btn.classList.remove('btn-outline-primary');
+                    btn.classList.add('btn-primary');
+                    diagramEl.innerHTML = renderPositionDiagram(pos, rootNote);
+                });
+                tabsEl.appendChild(btn);
+            });
+
+            const first = tabsEl.querySelector('.position-tab-btn');
+            if (first) first.click();
+            document.getElementById('positions-section').style.display = 'block';
+        }
 
     </script>
 </body>
